@@ -183,6 +183,9 @@ void ABCVm::registerClasses()
 	builtin->setVariableByQName("unescape","",Class<IFunction>::getFunction(unescape));
 	builtin->setVariableByQName("toString","",Class<IFunction>::getFunction(ASObject::_toString));
 
+	builtin->setVariableByQName("AccessibilityProperties","flash.accessibility",
+					Class<ASObject>::getClass(QName("AccessibilityProperties","flash.accessibility")));
+
 	builtin->setVariableByQName("MovieClip","flash.display",Class<MovieClip>::getClass());
 	builtin->setVariableByQName("DisplayObject","flash.display",Class<DisplayObject>::getClass());
 	builtin->setVariableByQName("Loader","flash.display",Class<Loader>::getClass());
@@ -333,7 +336,7 @@ multiname* ABCContext::s_getMultiname_d(call_context* th, number_t rtd, int n)
 				for(unsigned int i=0;i<s->count;i++)
 				{
 					const namespace_info* n=&th->context->constant_pool.namespaces[s->ns[i]];
-					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),(NS_KIND)(int)n->kind));
 				}
 				sort(ret->ns.begin(),ret->ns.end());
 				ret->name_d=rtd;
@@ -388,7 +391,7 @@ multiname* ABCContext::s_getMultiname(call_context* th, ASObject* rt1, int n)
 			{
 				const namespace_info* n=&th->context->constant_pool.namespaces[m->ns];
 				assert_and_throw(n->name);
-				ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),n->kind));
+				ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),(NS_KIND)(int)n->kind));
 
 				ret->name_s=th->context->getString(m->name);
 				ret->name_type=multiname::NAME_STRING;
@@ -401,7 +404,7 @@ multiname* ABCContext::s_getMultiname(call_context* th, ASObject* rt1, int n)
 				for(unsigned int i=0;i<s->count;i++)
 				{
 					const namespace_info* n=&th->context->constant_pool.namespaces[s->ns[i]];
-					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),(NS_KIND)(int)n->kind));
 				}
 				sort(ret->ns.begin(),ret->ns.end());
 				ret->name_s=th->context->getString(m->name);
@@ -415,7 +418,7 @@ multiname* ABCContext::s_getMultiname(call_context* th, ASObject* rt1, int n)
 				for(unsigned int i=0;i<s->count;i++)
 				{
 					const namespace_info* n=&th->context->constant_pool.namespaces[s->ns[i]];
-					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),(NS_KIND)(int)n->kind));
 				}
 				sort(ret->ns.begin(),ret->ns.end());
 				if(rt1->getObjectType()==T_INTEGER)
@@ -465,7 +468,7 @@ multiname* ABCContext::s_getMultiname(call_context* th, ASObject* rt1, int n)
 				assert_and_throw(rt1->prototype==Class<Namespace>::getClass());
 				Namespace* tmpns=static_cast<Namespace*>(rt1);
 				//TODO: What is the right ns kind?
-				ret->ns.push_back(nsNameAndKind(tmpns->uri,0x08));
+				ret->ns.push_back(nsNameAndKind(tmpns->uri,NAMESPACE));
 				ret->name_type=multiname::NAME_STRING;
 				ret->name_s=th->context->getString(m->name);
 				rt1->decRef();
@@ -563,7 +566,7 @@ multiname* ABCContext::s_getMultiname(call_context* th, ASObject* rt1, int n)
 				assert_and_throw(rt1->prototype==Class<Namespace>::getClass());
 				Namespace* tmpns=static_cast<Namespace*>(rt1);
 				//TODO: What is the right ns kind?
-				ret->ns.push_back(nsNameAndKind(tmpns->uri,0x08));
+				ret->ns.push_back(nsNameAndKind(tmpns->uri,NAMESPACE));
 				rt1->decRef();
 				break;
 			}
@@ -613,7 +616,7 @@ multiname* ABCContext::s_getMultiname_i(call_context* th, uintptr_t rti, int n)
 				for(unsigned int i=0;i<s->count;i++)
 				{
 					const namespace_info* n=&th->context->constant_pool.namespaces[s->ns[i]];
-					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(th->context->getString(n->name),(NS_KIND)(int)n->kind));
 				}
 				sort(ret->ns.begin(),ret->ns.end());
 				ret->name_i=rti;
@@ -667,9 +670,9 @@ multiname* ABCContext::getMultiname(unsigned int n, call_context* th)
 			{
 				const namespace_info* n=&constant_pool.namespaces[m->ns];
 				if(n->name)
-					ret->ns.push_back(nsNameAndKind(getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(getString(n->name),(NS_KIND)(int)n->kind));
 				else
-					ret->ns.push_back(nsNameAndKind("",n->kind));
+					ret->ns.push_back(nsNameAndKind("",(NS_KIND)(int)n->kind));
 
 				ret->name_s=getString(m->name);
 				ret->name_type=multiname::NAME_STRING;
@@ -682,7 +685,7 @@ multiname* ABCContext::getMultiname(unsigned int n, call_context* th)
 				for(unsigned int i=0;i<s->count;i++)
 				{
 					const namespace_info* n=&constant_pool.namespaces[s->ns[i]];
-					ret->ns.push_back(nsNameAndKind(getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(getString(n->name),(NS_KIND)(int)n->kind));
 				}
 				sort(ret->ns.begin(),ret->ns.end());
 
@@ -697,7 +700,7 @@ multiname* ABCContext::getMultiname(unsigned int n, call_context* th)
 				for(unsigned int i=0;i<s->count;i++)
 				{
 					const namespace_info* n=&constant_pool.namespaces[s->ns[i]];
-					ret->ns.push_back(nsNameAndKind(getString(n->name),n->kind));
+					ret->ns.push_back(nsNameAndKind(getString(n->name),(NS_KIND)(int)n->kind));
 				}
 				sort(ret->ns.begin(),ret->ns.end());
 
@@ -748,7 +751,7 @@ multiname* ABCContext::getMultiname(unsigned int n, call_context* th)
 				assert_and_throw(n->prototype==Class<Namespace>::getClass());
 				Namespace* tmpns=static_cast<Namespace*>(n);
 				//TODO: What is the right ns kind?
-				ret->ns.push_back(nsNameAndKind(tmpns->uri,0x08));
+				ret->ns.push_back(nsNameAndKind(tmpns->uri,NAMESPACE));
 				ret->name_type=multiname::NAME_STRING;
 				ret->name_s=getString(m->name);
 				n->decRef();
@@ -760,7 +763,7 @@ multiname* ABCContext::getMultiname(unsigned int n, call_context* th)
 				multiname_info* td=&constant_pool.multinames[m->type_definition];
 				//multiname_info* p=&constant_pool.multinames[m->param_types[0]];
 				const namespace_info* n=&constant_pool.namespaces[td->ns];
-				ret->ns.push_back(nsNameAndKind(getString(n->name),n->kind));
+				ret->ns.push_back(nsNameAndKind(getString(n->name),(NS_KIND)(int)n->kind));
 				ret->name_s=getString(td->name);
 				ret->name_type=multiname::NAME_STRING;
 				break;
@@ -855,7 +858,7 @@ multiname* ABCContext::getMultiname(unsigned int n, call_context* th)
 				assert_and_throw(n->prototype==Class<Namespace>::getClass());
 				Namespace* tmpns=static_cast<Namespace*>(n);
 				//TODO: What is the right kind?
-				ret->ns.push_back(nsNameAndKind(tmpns->uri,0x08));
+				ret->ns.push_back(nsNameAndKind(tmpns->uri,NAMESPACE));
 				n->decRef();
 				break;
 			}
@@ -1057,7 +1060,7 @@ void ABCVm::handleEvent(pair<EventDispatcher*,Event*> e)
 			{
 				FunctionEvent* ev=static_cast<FunctionEvent*>(e.second);
 				//We hope the method is binded
-				ev->f->call(NULL,NULL,0);
+				ev->f->call(ev->obj,ev->args,ev->numArgs,ev->thisOverride);
 				break;
 			}
 			case CONTEXT_INIT:
@@ -1344,7 +1347,7 @@ void ABCContext::exec()
 		SyntheticFunction* mf=Class<IFunction>::getSyntheticFunction(m);
 
 		for(unsigned int j=0;j<scripts[i].trait_count;j++)
-			buildTrait(global,&scripts[i].traits[j],mf);
+			buildTrait(global,&scripts[i].traits[j],false,mf);
 
 #ifndef NDEBUG
 		global->initialized=true;
@@ -1364,7 +1367,7 @@ void ABCContext::exec()
 
 	LOG(LOG_CALLS, _("Building entry script traits: ") << scripts[i].trait_count );
 	for(unsigned int j=0;j<scripts[i].trait_count;j++)
-		buildTrait(global,&scripts[i].traits[j]);
+		buildTrait(global,&scripts[i].traits[j],false);
 
 #ifndef NDEBUG
 		global->initialized=true;
@@ -1483,19 +1486,18 @@ void ABCContext::buildInstanceTraits(ASObject* obj, int class_index)
 		if(kind==traits_info::Slot || kind==traits_info::Class ||
 			kind==traits_info::Function || kind==traits_info::Const)
 		{
-			buildTrait(obj,&instances[class_index].traits[i]);
+			buildTrait(obj,&instances[class_index].traits[i],false);
 		}
 	}
 }
 
 void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 {
-	const multiname* mname=getMultiname(t->name,NULL);
+	const multiname& mname=*getMultiname(t->name,NULL);
 	//Should be a Qname
-	assert_and_throw(mname->ns.size()==1);
+	assert_and_throw(mname.ns.size()==1 && mname.name_type==multiname::NAME_STRING);
 
-	const tiny_string& name=mname->name_s;
-	const tiny_string& ns=mname->ns[0].name;
+	const tiny_string& name=mname.name_s;
 	if(t->kind>>4)
 		LOG(LOG_CALLS,_("Next slot has flags ") << (t->kind>>4));
 	switch(t->kind&0xf)
@@ -1503,7 +1505,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 		//Link the methods to the implementations
 		case traits_info::Method:
 		{
-			LOG(LOG_CALLS,_("Method trait: ") << ns << _("::") << name << _(" #") << t->method);
+			LOG(LOG_CALLS,_("Method trait: ") << mname << _(" #") << t->method);
 			method_info* m=&methods[t->method];
 			if(m->body!=NULL)
 				throw ParseException("Interface trait has to be a NULL body");
@@ -1512,7 +1514,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 			Class_base* cur=c;
 			while(cur)
 			{
-				var=cur->Variables.findObjVar(name,"",false);
+				var=cur->Variables.findObjVar(name,nsNameAndKind("",NAMESPACE),false,true);
 				if(var)
 					break;
 				cur=cur->super;
@@ -1522,19 +1524,19 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 				assert_and_throw(var->var);
 
 				var->var->incRef();
-				c->setVariableByQName(name,ns,var->var);
+				c->setVariableByMultiname(mname,var->var);
 			}
 			else
 			{
 				LOG(LOG_NOT_IMPLEMENTED,_("Method not linkable"));
 			}
 
-			LOG(LOG_TRACE,_("End Method trait: ") << ns << _("::") << name);
+			LOG(LOG_TRACE,_("End Method trait: ") << mname);
 			break;
 		}
 		case traits_info::Getter:
 		{
-			LOG(LOG_CALLS,_("Getter trait: ") << ns << _("::") << name);
+			LOG(LOG_CALLS,_("Getter trait: ") << mname);
 			method_info* m=&methods[t->method];
 			if(m->body!=NULL)
 				throw ParseException("Interface trait has to be a NULL body");
@@ -1543,7 +1545,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 			Class_base* cur=c;
 			while(cur)
 			{
-				var=cur->Variables.findObjVar(name,"",false);
+				var=cur->Variables.findObjVar(name,nsNameAndKind("",NAMESPACE),false,true);
 				if(var && var->getter)
 					break;
 				cur=cur->super;
@@ -1553,19 +1555,19 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 				assert_and_throw(var->getter);
 
 				var->getter->incRef();
-				c->setGetterByQName(name,ns,var->getter);
+				c->setGetterByQName(name,mname.ns[0],var->getter,true);
 			}
 			else
 			{
 				LOG(LOG_NOT_IMPLEMENTED,_("Getter not linkable"));
 			}
 			
-			LOG(LOG_TRACE,_("End Getter trait: ") << ns << _("::") << name);
+			LOG(LOG_TRACE,_("End Getter trait: ") << mname);
 			break;
 		}
 		case traits_info::Setter:
 		{
-			LOG(LOG_CALLS,_("Setter trait: ") << ns << _("::") << name << _(" #") << t->method);
+			LOG(LOG_CALLS,_("Setter trait: ") << mname << _(" #") << t->method);
 			method_info* m=&methods[t->method];
 			if(m->body!=NULL)
 				throw ParseException("Interface trait has to be a NULL body");
@@ -1574,7 +1576,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 			Class_base* cur=c;
 			while(cur)
 			{
-				var=cur->Variables.findObjVar(name,"",false);
+				var=cur->Variables.findObjVar(name,nsNameAndKind("",NAMESPACE),false,true);
 				if(var && var->setter)
 					break;
 				cur=cur->super;
@@ -1584,23 +1586,22 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 				assert_and_throw(var->setter);
 
 				var->setter->incRef();
-				c->setSetterByQName(name,ns,var->setter);
+				c->setSetterByQName(name,mname.ns[0],var->setter,true);
 			}
 			else
 			{
 				LOG(LOG_NOT_IMPLEMENTED,_("Setter not linkable"));
 			}
 			
-			LOG(LOG_TRACE,_("End Setter trait: ") << ns << _("::") << name);
+			LOG(LOG_TRACE,_("End Setter trait: ") << mname);
 			break;
 		}
 //		case traits_info::Class:
 //		case traits_info::Const:
 //		case traits_info::Slot:
 		default:
-			LOG(LOG_ERROR,_("Trait not supported ") << name << _(" ") << t->kind);
+			LOG(LOG_ERROR,_("Trait not supported ") << mname << _(" ") << t->kind);
 			throw UnsupportedException("Trait not supported");
-			//obj->setVariableByQName(name, ns, new Undefined);
 	}
 }
 
@@ -1633,15 +1634,11 @@ ASObject* ABCContext::getConstant(int kind, int index)
 	}
 }
 
-void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* deferred_initialization)
+void ABCContext::buildTrait(ASObject* obj, const traits_info* t, bool isBorrowed, IFunction* deferred_initialization)
 {
-	const multiname* mname=getMultiname(t->name,NULL);
+	const multiname& mname=*getMultiname(t->name,NULL);
 	//Should be a Qname
-	assert_and_throw(mname->ns.size()==1);
-
-	const tiny_string& name=mname->name_s;
-	const tiny_string& ns=mname->ns[0].name;
-
+	assert_and_throw(mname.ns.size()==1 && mname.name_type==multiname::NAME_STRING);
 	if(t->kind>>4)
 		LOG(LOG_CALLS,_("Next slot has flags ") << (t->kind>>4));
 	switch(t->kind&0xf)
@@ -1649,7 +1646,7 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 		case traits_info::Class:
 		{
 			//Check if this already defined in upper levels
-			ASObject* tmpo=obj->getVariableByQName(name,ns,true);
+			ASObject* tmpo=obj->getVariableByMultiname(mname,true);
 			if(tmpo)
 				return;
 
@@ -1659,16 +1656,16 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			else
 				ret=new Undefined;
 
-			obj->setVariableByQName(name, ns, ret);
+			obj->setVariableByMultiname(mname, ret);
 			
-			LOG(LOG_CALLS,_("Class slot ")<< t->slot_id << _(" type Class name ") << ns << _("::") << name << _(" id ") << t->classi);
+			LOG(LOG_CALLS,_("Class slot ")<< t->slot_id << _(" type Class name ") << mname << _(" id ") << t->classi);
 			if(t->slot_id)
-				obj->initSlot(t->slot_id, name, ns);
+				obj->initSlot(t->slot_id, mname);
 			break;
 		}
 		case traits_info::Getter:
 		{
-			LOG(LOG_CALLS,_("Getter trait: ") << ns << _("::") << name << _(" #") << t->method);
+			LOG(LOG_CALLS,_("Getter trait: ") << mname << _(" #") << t->method);
 			//syntetize method and create a new LLVM function object
 			method_info* m=&methods[t->method];
 			SyntheticFunction* f=Class<IFunction>::getSyntheticFunction(m);
@@ -1678,7 +1675,7 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			assert_and_throw(obj->getObjectType()==T_CLASS);
 			Class_inherit* prot=static_cast<Class_inherit*>(obj);
 			assert(prot);
-			if(t->kind&0x20 && prot->use_protected && ns==prot->protected_ns)
+			if(t->kind&0x20 && prot->use_protected && mname.ns[0]==prot->protected_ns)
 			{
 				//Walk the super chain and find variables to override
 				Class_base* cur=prot->super;
@@ -1686,13 +1683,13 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 				{
 					if(cur->use_protected)
 					{
-						obj_var* var=cur->Variables.findObjVar(name,cur->protected_ns,false);
+						obj_var* var=cur->Variables.findObjVar(mname.name_s,cur->protected_ns,false,isBorrowed);
 						if(var)
 						{
 							assert(var->getter);
 							//A superclass defined a protected method that we have to override.
 							f->incRef();
-							obj->setGetterByQName(name,cur->protected_ns,f);
+							obj->setGetterByQName(mname.name_s,cur->protected_ns,f,isBorrowed);
 						}
 					}
 					cur=cur->super;
@@ -1700,14 +1697,14 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			}
 
 			f->bindLevel(obj->getLevel());
-			obj->setGetterByQName(name,ns,f);
+			obj->setGetterByQName(mname.name_s,mname.ns[0],f,isBorrowed);
 			
-			LOG(LOG_TRACE,_("End Getter trait: ") << ns << _("::") << name);
+			LOG(LOG_TRACE,_("End Getter trait: ") << mname);
 			break;
 		}
 		case traits_info::Setter:
 		{
-			LOG(LOG_CALLS,_("Setter trait: ") << ns << _("::") << name << _(" #") << t->method);
+			LOG(LOG_CALLS,_("Setter trait: ") << mname << _(" #") << t->method);
 			//syntetize method and create a new LLVM function object
 			method_info* m=&methods[t->method];
 
@@ -1718,7 +1715,7 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			assert_and_throw(obj->getObjectType()==T_CLASS);
 			Class_base* prot=static_cast<Class_base*>(obj);
 			assert(prot);
-			if(t->kind&0x20 && prot->use_protected && ns==prot->protected_ns)
+			if(t->kind&0x20 && prot->use_protected && mname.ns[0]==prot->protected_ns)
 			{
 				//Walk the super chain and find variables to override
 				Class_base* cur=prot->super;
@@ -1726,13 +1723,13 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 				{
 					if(cur->use_protected)
 					{
-						obj_var* var=cur->Variables.findObjVar(name,cur->protected_ns,false);
+						obj_var* var=cur->Variables.findObjVar(mname.name_s,cur->protected_ns,false,isBorrowed);
 						if(var)
 						{
 							assert(var->setter);
 							//A superclass defined a protected method that we have to override.
 							f->incRef();
-							obj->setSetterByQName(name,cur->protected_ns,f);
+							obj->setSetterByQName(mname.name_s,cur->protected_ns,f,isBorrowed);
 						}
 					}
 					cur=cur->super;
@@ -1740,14 +1737,14 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			}
 
 			f->bindLevel(obj->getLevel());
-			obj->setSetterByQName(name,ns,f);
+			obj->setSetterByQName(mname.name_s,mname.ns[0],f,isBorrowed);
 			
-			LOG(LOG_TRACE,_("End Setter trait: ") << ns << _("::") << name);
+			LOG(LOG_TRACE,_("End Setter trait: ") << mname);
 			break;
 		}
 		case traits_info::Method:
 		{
-			LOG(LOG_CALLS,_("Method trait: ") << ns << _("::") << name << _(" #") << t->method);
+			LOG(LOG_CALLS,_("Method trait: ") << mname << _(" #") << t->method);
 			//syntetize method and create a new LLVM function object
 			method_info* m=&methods[t->method];
 			SyntheticFunction* f=Class<IFunction>::getSyntheticFunction(m);
@@ -1757,7 +1754,7 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			assert_and_throw(obj->getObjectType()==T_CLASS);
 			Class_inherit* prot=static_cast<Class_inherit*>(obj);
 			assert(prot);
-			if(t->kind&0x20 && prot->use_protected && ns==prot->protected_ns)
+			if(t->kind&0x20 && prot->use_protected && mname.ns[0]==prot->protected_ns)
 			{
 				//Walk the super chain and find variables to override
 				Class_base* cur=prot->super;
@@ -1765,13 +1762,13 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 				{
 					if(cur->use_protected)
 					{
-						obj_var* var=cur->Variables.findObjVar(name,cur->protected_ns,false);
+						obj_var* var=cur->Variables.findObjVar(mname.name_s,cur->protected_ns,false,isBorrowed);
 						if(var)
 						{
 							assert(var->var);
 							//A superclass defined a protected method that we have to override.
 							f->incRef();
-							obj->setVariableByQName(name,cur->protected_ns,f);
+							obj->setMethodByQName(mname.name_s,cur->protected_ns,f,isBorrowed);
 						}
 					}
 					cur=cur->super;
@@ -1779,17 +1776,17 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			}
 
 			f->bindLevel(obj->getLevel());
-			obj->setVariableByQName(name,ns,f);
+			obj->setMethodByQName(mname.name_s,mname.ns[0],f,isBorrowed);
 			//Methods save inside the scope stack of the class
 			f->acquireScope(prot->class_scope);
 
-			LOG(LOG_TRACE,_("End Method trait: ") << ns << _("::") << name);
+			LOG(LOG_TRACE,_("End Method trait: ") << mname);
 			break;
 		}
 		case traits_info::Const:
 		{
 			//Check if this already defined in upper levels
-			ASObject* tmpo=obj->getVariableByQName(name,ns,true);
+			ASObject* tmpo=obj->getVariableByMultiname(mname,true);
 			if(tmpo)
 				return;
 
@@ -1798,13 +1795,13 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			if(t->vindex)
 			{
 				ret=getConstant(t->vkind,t->vindex);
-				obj->setVariableByQName(name, ns, ret);
+				obj->setVariableByMultiname(mname, ret);
 				if(t->slot_id)
-					obj->initSlot(t->slot_id, name, ns);
+					obj->initSlot(t->slot_id, mname);
 			}
 			else
 			{
-				ret=obj->getVariableByQName(name,ns);
+				ret=obj->getVariableByMultiname(mname);
 				assert_and_throw(ret==NULL);
 				
 				if(deferred_initialization)
@@ -1812,17 +1809,17 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 				else
 					ret=new Undefined;
 
-				obj->setVariableByQName(name, ns, ret);
+				obj->setVariableByMultiname(mname, ret);
 			}
-			LOG(LOG_CALLS,_("Const ")<<name<<_(" type ")<< *getMultiname(t->type_name,NULL));
+			LOG(LOG_CALLS,_("Const ") << mname <<_(" type ")<< *getMultiname(t->type_name,NULL));
 			if(t->slot_id)
-				obj->initSlot(t->slot_id, name,ns );
+				obj->initSlot(t->slot_id, mname);
 			break;
 		}
 		case traits_info::Slot:
 		{
 			//Check if this already defined in upper levels
-			ASObject* tmpo=obj->getVariableByQName(name,ns,true);
+			ASObject* tmpo=obj->getVariableByMultiname(mname,true);
 			if(tmpo)
 				return;
 
@@ -1830,18 +1827,18 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 			if(t->vindex)
 			{
 				ASObject* ret=getConstant(t->vkind,t->vindex);
-				obj->setVariableByQName(name, ns, ret);
+				obj->setVariableByMultiname(mname, ret);
 				if(t->slot_id)
-					obj->initSlot(t->slot_id, name, ns);
+					obj->initSlot(t->slot_id, mname);
 
-				LOG(LOG_CALLS,_("Slot ") << t->slot_id << ' ' <<name<<_(" type ")<<*type);
+				LOG(LOG_CALLS,_("Slot ") << t->slot_id << ' ' << mname <<_(" type ")<<*type);
 				break;
 			}
 			else
 			{
 				//else fallthrough
-				LOG(LOG_CALLS,_("Slot ")<< t->slot_id<<  _(" vindex 0 ")<<name<<_(" type ")<<*type);
-				ASObject* previous_definition=obj->getVariableByQName(name,ns);
+				LOG(LOG_CALLS,_("Slot ")<< t->slot_id<<  _(" vindex 0 ") << mname <<_(" type ")<<*type);
+				ASObject* previous_definition=obj->getVariableByMultiname(mname);
 				assert_and_throw(!previous_definition);
 
 				ASObject* ret;
@@ -1863,16 +1860,16 @@ void ABCContext::buildTrait(ASObject* obj, const traits_info* t, IFunction* defe
 					else
 						ret=new Undefined;
 				}
-				obj->setVariableByQName(name, ns, ret);
+				obj->setVariableByMultiname(mname, ret);
 
 				if(t->slot_id)
-					obj->initSlot(t->slot_id, name,ns );
+					obj->initSlot(t->slot_id, mname);
 				break;
 			}
 		}
 		default:
-			LOG(LOG_ERROR,_("Trait not supported ") << name << _(" ") << t->kind);
-			obj->setVariableByQName(name, ns, new Undefined);
+			LOG(LOG_ERROR,_("Trait not supported ") << mname << _(" ") << t->kind);
+			obj->setVariableByMultiname(mname, new Undefined);
 	}
 }
 

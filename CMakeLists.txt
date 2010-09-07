@@ -92,7 +92,7 @@ ENDIF(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^i[3-6]86$|^x86$")
 # Using relative folders, cmake happens by itself CMAKE_INSTALL_PREFIX
 IF(UNIX)
    SET(BINDIR "bin")
-   SET(DATADIR "share")
+   SET(DATADIR "${CMAKE_INSTALL_PREFIX}/share")
    SET(LIBDIR "lib${LIB_SUFFIX}")
    SET(PRIVATELIBDIR "${CMAKE_INSTALL_PREFIX}/${LIBDIR}/lightspark")
    SET(CMAKE_INSTALL_RPATH "${PRIVATELIBDIR}")
@@ -134,7 +134,7 @@ ELSE(WIN32)
   INCLUDE(FindThreads REQUIRED)
 ENDIF(WIN32)
 
-find_package(Boost COMPONENTS filesystem system regex)
+find_package(Boost COMPONENTS filesystem system regex REQUIRED)
 if(Boost_FOUND)
   INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 ENDIF(Boost_FOUND)
@@ -349,7 +349,8 @@ IF(COMPILE_PLUGIN)
 ENDIF(COMPILE_PLUGIN)
 
 # generate locales for gettext
-GETTEXT_CREATE_TRANSLATIONS(i18n/lightspark.pot ALL i18n/pl.po i18n/fr.po)
+GETTEXT_CREATE_TRANSLATIONS(i18n/lightspark.pot ALL i18n/pl.po i18n/fr.po
+        i18n/zh_CN.po)
 
 #Audio backend plugins
 IF(${AUDIO_BACKEND} MATCHES "pulse")

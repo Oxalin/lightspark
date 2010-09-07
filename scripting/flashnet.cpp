@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **************************************************************************/
 
+#include <map>
 #include "abc.h"
 #include "flashnet.h"
 #include "class.h"
@@ -45,8 +46,8 @@ URLRequest::URLRequest()
 void URLRequest::sinit(Class_base* c)
 {
 	c->setConstructor(Class<IFunction>::getFunction(_constructor));
-	c->setSetterByQName("url","",Class<IFunction>::getFunction(_setURL));
-	c->setGetterByQName("url","",Class<IFunction>::getFunction(_getURL));
+	c->setSetterByQName("url","",Class<IFunction>::getFunction(_setURL),true);
+	c->setGetterByQName("url","",Class<IFunction>::getFunction(_getURL),true);
 }
 
 void URLRequest::buildTraits(ASObject* o)
@@ -85,10 +86,10 @@ void URLLoader::sinit(Class_base* c)
 	c->setConstructor(Class<IFunction>::getFunction(_constructor));
 	c->super=Class<EventDispatcher>::getClass();
 	c->max_level=c->super->max_level+1;
-	c->setGetterByQName("dataFormat","",Class<IFunction>::getFunction(_getDataFormat));
-	c->setGetterByQName("data","",Class<IFunction>::getFunction(_getData));
-	c->setSetterByQName("dataFormat","",Class<IFunction>::getFunction(_setDataFormat));
-	c->setVariableByQName("load","",Class<IFunction>::getFunction(load));
+	c->setGetterByQName("dataFormat","",Class<IFunction>::getFunction(_getDataFormat),true);
+	c->setGetterByQName("data","",Class<IFunction>::getFunction(_getData),true);
+	c->setSetterByQName("dataFormat","",Class<IFunction>::getFunction(_setDataFormat),true);
+	c->setMethodByQName("load","",Class<IFunction>::getFunction(load),true);
 }
 
 void URLLoader::buildTraits(ASObject* o)
@@ -109,28 +110,32 @@ ASFUNCTIONBODY(URLLoader,load)
 	URLRequest* urlRequest=static_cast<URLRequest*>(arg);
 	//Check for URLRequest.url != null
 	if(urlRequest->url.len() == 0)
-		throw "TypeError";
+		throw Class<TypeError>::getInstanceS();
 
 	th->url=sys->getOrigin().goToURL(urlRequest->url);
 
 	//Network sandboxes can't access local files (this should be a SecurityErrorEvent)
 	if(th->url.getProtocol() == "file" &&
 			sys->sandboxType != Security::LOCAL_WITH_FILE && sys->sandboxType != Security::LOCAL_TRUSTED)
-		throw SecurityError("SecurityError: URLLoader::load: connect to local file");
+		throw Class<SecurityError>::getInstanceS("SecurityError: URLLoader::load: connect to local file");
 	//Local-with-filesystem sandbox can't access network
 	else if(th->url.getProtocol() != "file" && sys->sandboxType == Security::LOCAL_WITH_FILE)
-		throw SecurityError("SecurityError: URLLoader::load: connect to network");
+		throw Class<SecurityError>::getInstanceS("SecurityError: URLLoader::load: connect to network");
 
 	//TODO: support the right events (like SecurityErrorEvent)
 
 	//TODO: use domain policy files to check if domain access is allowed
 	//TODO: should we disallow accessing local files in a directory above the current one like we do with NetStream.play?
 
-	ASObject* data=arg->getVariableByQName("data","");
+	multiname dataName;
+	dataName.name_type=multiname::NAME_STRING;
+	dataName.name_s="data";
+	dataName.ns.push_back(nsNameAndKind("",NAMESPACE));
+	ASObject* data=arg->getVariableByMultiname(dataName);
 	if(data)
 	{
 		if(data->getPrototype()==Class<URLVariables>::getClass())
-			throw RunTimeException("Type mismatch in URLLoader::load");
+			throw RunTimeException("Type mismatch in URLLoader::load parameter: URLVariables instead of URLRequest");
 		else
 		{
 			tiny_string newURL = th->url.getParsedURL();
@@ -151,7 +156,8 @@ ASFUNCTIONBODY(URLLoader,load)
 	}
 	else //The URL is valid so we can start the download and add ourself as a job
 	{
-		th->downloader=sys->downloadManager->download(th->url);
+		//Don't cache our downloaded files
+		th->downloader=sys->downloadManager->download(th->url, false);
 
 		th->incRef();
 		sys->addJob(th);
@@ -169,19 +175,19 @@ void URLLoader::execute()
 		if(!downloader->hasFailed())
 		{
 			istream s(downloader);
-			char buf[downloader->getLen()];
-			s.read(buf,downloader->getLen());
+			char buf[downloader->getLength()];
+			s.read(buf,downloader->getLength());
 			//TODO: test binary data format
 			if(dataFormat=="binary")
 			{
 				ByteArray* byteArray=Class<ByteArray>::getInstanceS();
-				byteArray->acquireBuffer((uint8_t*) buf,downloader->getLen());
+				byteArray->acquireBuffer((uint8_t*) buf,downloader->getLength());
 				data=byteArray;
 			}
 			else if(dataFormat=="text")
 			{
 				data=Class<ASString>::getInstanceS((const char *)buf,
-									downloader->getLen());
+									downloader->getLength());
 			}
 			//Send a complete event for this object
 			sys->currentVm->addEvent(this,Class<Event>::getInstanceS("complete"));
@@ -256,15 +262,15 @@ void NetConnection::sinit(Class_base* c)
 	c->setConstructor(Class<IFunction>::getFunction(_constructor));
 	c->super=Class<EventDispatcher>::getClass();
 	c->max_level=c->super->max_level+1;
-	c->setVariableByQName("connect","",Class<IFunction>::getFunction(connect));
-	c->setGetterByQName("connected","",Class<IFunction>::getFunction(_getConnected));
-	c->setGetterByQName("defaultObjectEncoding","",Class<IFunction>::getFunction(_getDefaultObjectEncoding));
-	c->setSetterByQName("defaultObjectEncoding","",Class<IFunction>::getFunction(_setDefaultObjectEncoding));
+	c->setMethodByQName("connect","",Class<IFunction>::getFunction(connect),true);
+	c->setGetterByQName("connected","",Class<IFunction>::getFunction(_getConnected),true);
+	c->setGetterByQName("defaultObjectEncoding","",Class<IFunction>::getFunction(_getDefaultObjectEncoding),true);
+	c->setSetterByQName("defaultObjectEncoding","",Class<IFunction>::getFunction(_setDefaultObjectEncoding),true);
 	sys->staticNetConnectionDefaultObjectEncoding = ObjectEncoding::DEFAULT;
-	c->setGetterByQName("objectEncoding","",Class<IFunction>::getFunction(_getObjectEncoding));
-	c->setSetterByQName("objectEncoding","",Class<IFunction>::getFunction(_setObjectEncoding));
-	c->setGetterByQName("protocol","",Class<IFunction>::getFunction(_getProtocol));
-	c->setGetterByQName("uri","",Class<IFunction>::getFunction(_getURI));
+	c->setGetterByQName("objectEncoding","",Class<IFunction>::getFunction(_getObjectEncoding),true);
+	c->setSetterByQName("objectEncoding","",Class<IFunction>::getFunction(_setObjectEncoding),true);
+	c->setGetterByQName("protocol","",Class<IFunction>::getFunction(_getProtocol),true);
+	c->setGetterByQName("uri","",Class<IFunction>::getFunction(_getURI),true);
 }
 
 void NetConnection::buildTraits(ASObject* o)
@@ -290,7 +296,7 @@ ASFUNCTIONBODY(NetConnection,connect)
 		//LOCAL_WITH_FILE may not use connect(), even if it tries to connect to a local file.
 		//I'm following the specification to the letter
 		if(sys->sandboxType == Security::LOCAL_WITH_FILE)
-			throw SecurityError("NetConnection::connect from LOCAL_WITH_FILE sandbox");
+			throw Class<SecurityError>::getInstanceS("NetConnection::connect from LOCAL_WITH_FILE sandbox");
 	}
 	//String argument means Flash Remoting/Flash Media Server
 	else
@@ -345,7 +351,7 @@ ASFUNCTIONBODY(NetConnection,_setObjectEncoding)
 	assert_and_throw(argslen == 1);
 	if(th->_connected)
 	{
-		throw ReferenceError("set NetConnection.objectEncoding after connect");
+		throw Class<ReferenceError>::getInstanceS("set NetConnection.objectEncoding after connect");
 	}
 	int32_t value = args[0]->toInt();
 	if(value == 0)
@@ -361,7 +367,7 @@ ASFUNCTIONBODY(NetConnection,_getProtocol)
 	if(th->_connected)
 		return Class<ASString>::getInstanceS(th->protocol);
 	else
-		throw ArgumentError("get NetConnection.protocol before connect");
+		throw Class<ArgumentError>::getInstanceS("get NetConnection.protocol before connect");
 }
 
 ASFUNCTIONBODY(NetConnection,_getURI)
@@ -396,19 +402,34 @@ void NetStream::sinit(Class_base* c)
 	c->max_level=c->super->max_level+1;
 	c->setVariableByQName("CONNECT_TO_FMS","",Class<ASString>::getInstanceS("connectToFMS"));
 	c->setVariableByQName("DIRECT_CONNECTIONS","",Class<ASString>::getInstanceS("directConnections"));
-	c->setVariableByQName("play","",Class<IFunction>::getFunction(play));
-	c->setVariableByQName("resume","",Class<IFunction>::getFunction(resume));
-	c->setVariableByQName("pause","",Class<IFunction>::getFunction(pause));
-	c->setVariableByQName("togglePause","",Class<IFunction>::getFunction(togglePause));
-	c->setVariableByQName("close","",Class<IFunction>::getFunction(close));
-	c->setVariableByQName("seek","",Class<IFunction>::getFunction(seek));
-	c->setGetterByQName("bytesLoaded","",Class<IFunction>::getFunction(_getBytesLoaded));
-	c->setGetterByQName("bytesTotal","",Class<IFunction>::getFunction(_getBytesTotal));
-	c->setGetterByQName("time","",Class<IFunction>::getFunction(_getTime));
+	c->setMethodByQName("play","",Class<IFunction>::getFunction(play),true);
+	c->setMethodByQName("resume","",Class<IFunction>::getFunction(resume),true);
+	c->setMethodByQName("pause","",Class<IFunction>::getFunction(pause),true);
+	c->setMethodByQName("togglePause","",Class<IFunction>::getFunction(togglePause),true);
+	c->setMethodByQName("close","",Class<IFunction>::getFunction(close),true);
+	c->setMethodByQName("seek","",Class<IFunction>::getFunction(seek),true);
+	c->setGetterByQName("bytesLoaded","",Class<IFunction>::getFunction(_getBytesLoaded),true);
+	c->setGetterByQName("bytesTotal","",Class<IFunction>::getFunction(_getBytesTotal),true);
+	c->setGetterByQName("time","",Class<IFunction>::getFunction(_getTime),true);
+	c->setGetterByQName("currentFPS","",Class<IFunction>::getFunction(_getCurrentFPS),true);
+	c->setSetterByQName("client","",Class<IFunction>::getFunction(_setClient),true);
 }
 
 void NetStream::buildTraits(ASObject* o)
 {
+}
+
+ASFUNCTIONBODY(NetStream,_setClient)
+{
+	assert_and_throw(argslen == 1);
+	if(args[0]->getObjectType() == T_NULL)
+		throw Class<TypeError>::getInstanceS();
+
+	NetStream* th=Class<NetStream>::cast(obj);
+
+	th->client = args[0];
+	th->client->incRef();
+	return NULL;
 }
 
 ASFUNCTIONBODY(NetStream,_constructor)
@@ -432,8 +453,10 @@ ASFUNCTIONBODY(NetStream,_constructor)
 		else if(args[1]->getObjectType() == T_NULL)
 			th->peerID = CONNECT_TO_FMS;
 		else
-			throw ArgumentError("NetStream constructor: peerID");
+			throw Class<ArgumentError>::getInstanceS("NetStream constructor: peerID");
 	}
+
+	th->client = th;
 
 	assert_and_throw(netConnection->uri.getURL()=="");
 	return NULL;
@@ -458,12 +481,12 @@ ASFUNCTIONBODY(NetStream,play)
 	th->url = sys->getOrigin().goToURL(arg0);
 
 	if(sys->sandboxType == Security::LOCAL_WITH_FILE && th->url.getProtocol() != "file")
-		throw SecurityError("NetStream::play: connect to network from local-with-filesystem sandbox");
+		throw Class<SecurityError>::getInstanceS("NetStream::play: connect to network from local-with-filesystem sandbox");
 	if(sys->sandboxType != Security::LOCAL_WITH_FILE && sys->sandboxType != Security::LOCAL_TRUSTED && 
 			th->url.getProtocol() == "file")
-		throw SecurityError("NetStream::play: connect to local file from network sandbox");
+		throw Class<SecurityError>::getInstanceS("NetStream::play: connect to local file from network sandbox");
 	if(th->url.getProtocol() == "file" && !th->url.isSubOf(sys->getOrigin()))
-		throw SecurityError("NetStream::play: not allowed to navigate up for local files");
+		throw Class<SecurityError>::getInstanceS("NetStream::play: not allowed to navigate up for local files");
 
 	//TODO: use domain policy files to check if domain access is allowed
 
@@ -476,7 +499,8 @@ ASFUNCTIONBODY(NetStream,play)
 	}
 	else //The URL is valid so we can start the download and add ourself as a job
 	{
-		th->downloader=sys->downloadManager->download(th->url);
+		//Cache our downloaded files
+		th->downloader=sys->downloadManager->download(th->url, true);
 		th->streamTime=0;
 		th->incRef();
 		sys->addJob(th);
@@ -487,14 +511,26 @@ ASFUNCTIONBODY(NetStream,play)
 ASFUNCTIONBODY(NetStream,resume)
 {
 	NetStream* th=Class<NetStream>::cast(obj);
-	th->paused = false;
+	if(th->paused)
+	{
+		th->paused = false;
+		Event* status=Class<NetStatusEvent>::getInstanceS("status", "NetStream.Unpause.Notify");
+		getVm()->addEvent(th, status);
+		status->decRef();
+	}
 	return NULL;
 }
 
 ASFUNCTIONBODY(NetStream,pause)
 {
 	NetStream* th=Class<NetStream>::cast(obj);
-	th->paused = true;
+	if(!th->paused)
+	{
+		th->paused = true;
+		Event* status=Class<NetStatusEvent>::getInstanceS("status", "NetStream.Pause.Notify");
+		getVm()->addEvent(th, status);
+		status->decRef();
+	}
 	return NULL;
 }
 
@@ -514,7 +550,13 @@ ASFUNCTIONBODY(NetStream,close)
 	//TODO: set the time property to 0
 	
 	//Everything is stopped in threadAbort
-	th->threadAbort();
+	if(!th->closed)
+	{
+		th->threadAbort();
+		Event* status=Class<NetStatusEvent>::getInstanceS("status", "NetStream.Play.Stop");
+		getVm()->addEvent(th, status);
+		status->decRef();
+	}
 	LOG(LOG_CALLS, _("NetStream::close called"));
 	return NULL;
 }
@@ -626,6 +668,7 @@ void NetStream::execute()
 	bool waitForFlush=true;
 	try
 	{
+		ScriptDataTag tag;
 		Chronometer chronometer;
 		STREAM_TYPE t=classifyStream(s);
 		if(t==FLV_STREAM)
@@ -745,12 +788,13 @@ void NetStream::execute()
 					}
 					case 18:
 					{
-						ScriptDataTag tag(s);
+						tag = ScriptDataTag(s);
 						prevSize=tag.getTotalLen();
 
 						//The frameRate of the container overrides the stream
-						if(tag.frameRate)
-							frameRate=tag.frameRate;
+						
+						if(tag.metadataDouble.find("framerate") != tag.metadataDouble.end())
+							frameRate=tag.metadataDouble["framerate"];
 						break;
 					}
 					default:
@@ -759,6 +803,45 @@ void NetStream::execute()
 				}
 				if(!tickStarted && isReady())
 				{
+					{
+						multiname onMetaDataName;
+						onMetaDataName.name_type=multiname::NAME_STRING;
+						onMetaDataName.name_s="onMetaData";
+						onMetaDataName.ns.push_back(nsNameAndKind("",NAMESPACE));
+						ASObject* callback = client->getVariableByMultiname(onMetaDataName);
+						if(callback && callback->getObjectType() == T_FUNCTION)
+						{
+							ASObject* callbackArgs[1];
+							ASObject* metadata = Class<ASObject>::getInstanceS();
+							if(tag.metadataDouble.find("width") != tag.metadataDouble.end())
+								metadata->setVariableByQName("width", "", abstract_d(tag.metadataDouble["width"]));
+							else
+								metadata->setVariableByQName("width", "", abstract_d(getVideoWidth()));
+							if(tag.metadataDouble.find("height") != tag.metadataDouble.end())
+								metadata->setVariableByQName("height", "", abstract_d(tag.metadataDouble["height"]));
+							else
+								metadata->setVariableByQName("height", "", abstract_d(getVideoHeight()));
+
+							if(tag.metadataDouble.find("framerate") != tag.metadataDouble.end())
+								metadata->setVariableByQName("framerate", "", abstract_d(tag.metadataDouble["framerate"]));
+							if(tag.metadataDouble.find("duration") != tag.metadataDouble.end())
+								metadata->setVariableByQName("duration", "", abstract_d(tag.metadataDouble["duration"]));
+							if(tag.metadataInteger.find("canseekontime") != tag.metadataInteger.end())
+								metadata->setVariableByQName("canSeekToEnd", "", abstract_b(tag.metadataInteger["canseekontime"] == 1));
+
+							if(tag.metadataDouble.find("audiodatarate") != tag.metadataDouble.end())
+								metadata->setVariableByQName("audiodatarate", "", abstract_d(tag.metadataDouble["audiodatarate"]));
+							if(tag.metadataDouble.find("videodatarate") != tag.metadataDouble.end())
+								metadata->setVariableByQName("videodatarate", "", abstract_d(tag.metadataDouble["videodatarate"]));
+
+							//TODO: missing: audiocodecid (Number), cuePoints (Object[]), videocodecid (Number), custommetadata's
+							callbackArgs[0] = metadata;
+							client->incRef();
+							metadata->incRef();
+							getVm()->addEvent(NULL,new FunctionEvent(static_cast<IFunction*>(callback), client, callbackArgs, 1));
+						}
+					}
+
 					tickStarted=true;
 					if(frameRate==0)
 					{
@@ -795,22 +878,20 @@ void NetStream::execute()
 	catch(exception& e)
 	{
 		LOG(LOG_ERROR, _("Exception in reading: ")<<e.what());
+		LOG(LOG_ERROR, "Failbit: " << ((s.rdstate() & istream::failbit) != 0) << ", badbit: " << ((s.rdstate() & istream::badbit) != 0));
 	}
-
 	if(waitForFlush)
 	{
 		//Put the decoders in the flushing state and wait for the complete consumption of contents
 		if(audioDecoder)
-		{
-		  audioDecoder->setFlushing();
-		  audioDecoder->waitFlushed();
-		}
-		
+			audioDecoder->setFlushing();
 		if(videoDecoder)
-		{
-		  videoDecoder->setFlushing();
-		  videoDecoder->waitFlushed();
-		}
+			videoDecoder->setFlushing();
+		
+		if(audioDecoder)
+			audioDecoder->waitFlushed();
+		if(videoDecoder)
+			videoDecoder->waitFlushed();
 	}
 
 	//Clean up everything for a possible re-run
@@ -821,12 +902,13 @@ void NetStream::execute()
 	//Before deleting stops ticking, removeJobs also spin waits for termination
 	sys->removeJob(this);
 	tickStarted=false;
-	delete videoDecoder;
+	if(videoDecoder)
+		delete videoDecoder;
 	videoDecoder=NULL;
-
 	if(audioStream)
 		sys->audioManager->freeStreamPlugin(audioStream);
-	delete audioDecoder;
+	if(audioDecoder)
+		delete audioDecoder;
 //	soundStreamId = 0;
 	audioDecoder=NULL;
 
@@ -859,17 +941,39 @@ void NetStream::threadAbort()
 
 ASFUNCTIONBODY(NetStream,_getBytesLoaded)
 {
-	return abstract_i(0);
+	NetStream* th=Class<NetStream>::cast(obj);
+	if(th->isReady())
+		return abstract_i(th->getReceivedLength());
+	else
+		return abstract_i(0);
 }
 
 ASFUNCTIONBODY(NetStream,_getBytesTotal)
 {
-	return abstract_i(100);
+	NetStream* th=Class<NetStream>::cast(obj);
+	if(th->isReady())
+		return abstract_i(th->getTotalLength());
+	else
+		return abstract_d(0);
 }
 
 ASFUNCTIONBODY(NetStream,_getTime)
 {
-	return abstract_d(0);
+	NetStream* th=Class<NetStream>::cast(obj);
+	if(th->isReady())
+		return abstract_d(th->getStreamTime()/1000.);
+	else
+		return abstract_d(0);
+}
+
+ASFUNCTIONBODY(NetStream,_getCurrentFPS)
+{
+	//TODO: provide real FPS (what really is displayed)
+	NetStream* th=Class<NetStream>::cast(obj);
+	if(th->isReady() && !th->paused)
+		return abstract_d(th->getFrameRate());
+	else
+		return abstract_d(0);
 }
 
 uint32_t NetStream::getVideoWidth() const
@@ -888,6 +992,24 @@ double NetStream::getFrameRate()
 {
 	assert(isReady());
 	return frameRate;
+}
+
+uint32_t NetStream::getStreamTime()
+{
+	assert(isReady());
+	return streamTime;
+}
+
+uint32_t NetStream::getReceivedLength()
+{
+	assert(isReady());
+	return downloader->getReceivedLength();
+}
+
+uint32_t NetStream::getTotalLength()
+{
+	assert(isReady());
+	return downloader->getLength();
 }
 
 bool NetStream::copyFrameToTexture(TextureBuffer& tex)
