@@ -230,7 +230,7 @@ int32_t PluginManager::findPluginInList ( string desiredname, string desiredback
 //Takes care to load and instanciate anything related to the plugin
 void PluginManager::loadPlugin ( uint32_t desiredindex )
 {
-	if ( pluginsList[desiredindex]->hLoadedPlugin = LoadLib ( pluginsList[desiredindex]->pluginPath ) )
+	if ( (pluginsList[desiredindex]->hLoadedPlugin = LoadLib ( pluginsList[desiredindex]->pluginPath )) )
 	{
 		PLUGIN_FACTORY p_factory_function = ( PLUGIN_FACTORY ) ExtractLibContent ( pluginsList[desiredindex]->hLoadedPlugin, "create" );
 		if ( p_factory_function != NULL )   //Does it contain the LS IPlugin?

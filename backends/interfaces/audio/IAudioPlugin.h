@@ -54,8 +54,6 @@ protected:
 	vector<string *> captureDevicesList;
 	list<AudioStream *> streams;
 	typedef list<AudioStream *>::iterator stream_iterator;
-	volatile bool contextReady;
-	volatile bool noServer;
 	bool stopped;
 	IAudioPlugin ( string plugin_name, string backend_name, bool init_stopped = false );
 
