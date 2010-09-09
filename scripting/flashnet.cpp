@@ -175,19 +175,19 @@ void URLLoader::execute()
 		if(!downloader->hasFailed())
 		{
 			istream s(downloader);
-			char buf[downloader->getLength()];
-			s.read(buf,downloader->getLength());
+			uint8_t* buf=new uint8_t[downloader->getLength()];
+			//TODO: avoid this useless copy
+			s.read((char*)buf,downloader->getLength());
 			//TODO: test binary data format
 			if(dataFormat=="binary")
 			{
 				ByteArray* byteArray=Class<ByteArray>::getInstanceS();
-				byteArray->acquireBuffer((uint8_t*) buf,downloader->getLength());
+				byteArray->acquireBuffer(buf,downloader->getLength());
 				data=byteArray;
 			}
 			else if(dataFormat=="text")
 			{
-				data=Class<ASString>::getInstanceS((const char *)buf,
-									downloader->getLength());
+				data=Class<ASString>::getInstanceS((char*)buf,downloader->getLength());
 			}
 			//Send a complete event for this object
 			sys->currentVm->addEvent(this,Class<Event>::getInstanceS("complete"));
@@ -379,8 +379,8 @@ ASFUNCTIONBODY(NetConnection,_getURI)
 		return new Undefined;
 }
 
-//NetStream::NetStream():frameRate(0),tickStarted(false),downloader(NULL),videoDecoder(NULL),audioDecoder(NULL),audioStream(NULL),streamTime(0),paused(false),audioPaused(false),closed(true)
-NetStream::NetStream():frameRate(0),tickStarted(false),downloader(NULL),videoDecoder(NULL),audioDecoder(NULL),audioStream(NULL),streamTime(0),paused(false),closed(true)
+NetStream::NetStream():frameRate(0),tickStarted(false),downloader(NULL),videoDecoder(NULL),audioDecoder(NULL),audioStream(NULL),streamTime(0),
+		paused(false),closed(true)
 {
 	sem_init(&mutex,0,1);
 }

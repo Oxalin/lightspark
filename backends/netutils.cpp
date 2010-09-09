@@ -83,11 +83,13 @@ Downloader::~Downloader()
 	sem_destroy(&terminated);
 }
 
-Downloader::Downloader():allowBufferRealloc(false),cached(false),waiting(false),hasTerminated(false),failed(false),finished(false),buffer(NULL),len(0),tail(0),keepCache(false)
+Downloader::Downloader():allowBufferRealloc(false),cached(false),waiting(false),hasTerminated(false),failed(false),finished(false),buffer(NULL),len(0),
+	tail(0),cachePos(0),cacheSize(0),keepCache(false)
 {
 	sem_init(&available,0,0);
 	sem_init(&mutex,0,1);
 	sem_init(&terminated,0,0);
+	setg(NULL,NULL,NULL);
 }
 
 void Downloader::stop()
@@ -129,6 +131,7 @@ void Downloader::setFinished()
 
 void Downloader::setLen(uint32_t l)
 {
+	sem_wait(&mutex);
 	len=l;
 	if(cached && !cache.is_open())
 	{
@@ -180,6 +183,7 @@ void Downloader::setLen(uint32_t l)
 			assert_and_throw(buffer==NULL);
 		}
 	}
+	sem_post(&mutex);
 }
 
 void Downloader::append(uint8_t* buf, uint32_t added)
@@ -235,10 +239,11 @@ Downloader::int_type Downloader::underflow()
 {
 	sem_wait(&mutex);
 	assert(gptr()==egptr());
-
-	unsigned int startTail=tail;
-	//There is no data to read yet OR we have read all available data
-	if(startTail==0 || (!cached && startTail==((uint8_t*)egptr()-buffer)) || (cached && startTail == cachePos+(((uint8_t*)egptr())-buffer)))
+	const unsigned int startOff=getOffset();
+	const unsigned int startTail=tail;
+	assert(startOff<=startTail);
+	//If we have read all available data
+	if(startTail==startOff)
 	{
 		//The download is failed, the end is reached or the download has finished
 		if(failed || (startTail==len && len!=0) || finished)
@@ -298,7 +303,7 @@ Downloader::int_type Downloader::underflow()
 		begin=(char*)buffer;
 		cur=gptr();
 		end=(char*)buffer+tail;
-		index=startTail;
+		index=startOff;
 	}
 
 	//If we've failed, don't bother any more
@@ -364,16 +369,22 @@ Downloader::pos_type Downloader::seekpos(pos_type pos, std::ios_base::openmode m
 	return pos;
 }
 
+Downloader::pos_type Downloader::getOffset() const
+{
+	pos_type ret = gptr()-eback();
+	if(cached)
+		ret+=cachePos;
+	return ret;
+}
+
 Downloader::pos_type Downloader::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode mode)
 {
 	assert_and_throw(mode==std::ios_base::in);
 	assert_and_throw(off==0);
 	assert_and_throw(buffer != NULL);
 
-	pos_type ret = gptr()-eback();
 	//Nothing special to do here, we only support offset==0 seeks
-	if(cached)
-		ret+=cachePos;
+	pos_type ret=getOffset();
 	return ret;
 }
 
