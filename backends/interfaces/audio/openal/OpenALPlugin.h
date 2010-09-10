@@ -46,9 +46,9 @@ private:
 	void start();
 	void stop();
 public:
-	OpenALPlugin( string init_Name = "OpenAL plugin", string init_audiobackend = "openal",
+	OpenALPlugin( std::string init_Name = "OpenAL plugin", std::string init_audiobackend = "openal",
 		      bool init_stopped = false );
-	void set_device( string desiredDeviceName, DEVICE_TYPES desiredType );
+	void set_device( std::string desiredDeviceName, DEVICE_TYPES desiredType );
 	AudioStream *createStream( lightspark::AudioDecoder *decoder );
 	void freeStream( AudioStream *audioStream );
 	void pauseStream( AudioStream *audioStream );

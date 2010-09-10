@@ -20,7 +20,6 @@
 #include "OpenALPlugin.h"
 
 using namespace lightspark;
-
 using namespace std;
 
 
