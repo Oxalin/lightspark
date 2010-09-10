@@ -31,9 +31,6 @@
 #define BUFFER_SIZE 19200
 #define NUM_SOURCES 1
 
-using namespace std;
-
-
 class OpenALPlugin : public IAudioPlugin
 {
 private:
@@ -44,8 +41,8 @@ private:
 	ALuint	pbSources[NUM_SOURCES];
 	void initPlayback( OpenALPlugin *th );
 	void initCapture( OpenALPlugin *th );
-	void addDeviceToList( vector<string *> *devicesList, string *deviceName );
-	void generateDevicesList( vector<string *> *devicesList, DEVICE_TYPES desiredType );  //To populate the devices lists, devicesType must be playback or capture
+	void addDeviceToList ( std::vector<std::string *> *devicesList, std::string *deviceName );
+	void generateDevicesList ( std::vector<std::string *> *devicesList, DEVICE_TYPES desiredType ); //To populate the devices lists, devicesType must be playback or capture
 	void start();
 	void stop();
 public:
