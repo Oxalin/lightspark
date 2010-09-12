@@ -55,17 +55,19 @@ void OpenALPlugin::start()
 
 void OpenALPlugin::initCapture( OpenALPlugin *th )
 {
-	th->captureDevice = alcCaptureOpenDevice( NULL );	//NULL to be changed to the one from the config
-
+/*
+	th->captureDevice = alcCaptureOpenDevice( th->captureDeviceName );
+	
 	if ()	//verify capture device could be opened
 	{
 	}
+*/
 }
 
 void OpenALPlugin::initPlayback( OpenALPlugin *th )
 {
   ALenum error;
-	th->playbackDevice = alcOpenDevice( NULL );	//NULL to be changed to the one from the config
+	th->playbackDevice = alcOpenDevice( th->playbackDeviceName );
 
 	if ( th->playbackDevice ) //verify playback device could be opened
 	{
@@ -185,12 +187,12 @@ void OpenALPlugin::generateDevicesList( vector< string* >* devicesList, DEVICE_T
 
 		if ( desiredType == PLAYBACK )
 		{
-			devices = (ALCchar *)alcGetString( NULL, ALC_DEVICE_SPECIFIER );
+			devices = alcGetString( NULL, ALC_DEVICE_SPECIFIER );
 		}
 
 		else if ( desiredType == CAPTURE )
 		{
-			devices = (ALCchar *)alcGetString( NULL, ALC_CAPTURE_DEVICE_SPECIFIER );
+			devices = alcGetString( NULL, ALC_CAPTURE_DEVICE_SPECIFIER );
 		}
 
 		while () //Split the devices' name and add them to the device list
