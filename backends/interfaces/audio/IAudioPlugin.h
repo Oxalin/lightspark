@@ -26,16 +26,21 @@
 #include "../IPlugin.h"
 #include <iostream>
 
+
+enum STREAM_STATUS { STARTING = 0, READY, DEAD, PLAYING, PAUSED, STOPPED };
+
 class AudioStream
 {
   protected:
-	AudioStream(lightspark::AudioDecoder *dec = NULL, bool initPause = false);
+	volatile STREAM_STATUS status;	//Indicates the stream status
+	AudioStream(lightspark::AudioDecoder *dec = NULL, STREAM_STATUS initStatus = STARTING);
 
   public:
 	lightspark::AudioDecoder *decoder;
-	bool pause;	//Indicates whether the stream is paused as a result of pauseStream being called
 	virtual bool paused() = 0;	//Is the stream paused? (corked)
-	virtual bool isValid() = 0; //Is the stream alive, fully working?
+	virtual bool isValid() = 0;	//Is the stream alive, fully working?
+	virtual void setStatus(STREAM_STATUS streamStatus);	//Set the stream status
+	virtual STREAM_STATUS getStatus();	//Get the stream status
 	virtual uint32_t getPlayedTime() = 0;
 	virtual void fill() = 0;
 	virtual ~AudioStream() {};
