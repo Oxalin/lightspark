@@ -18,6 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **************************************************************************/
 
+#include <iostream>	//needed because of a bug in ffmpeg, otherwise it complains about UINT64_C not defined
 #include "PulsePlugin.h"
 
 #include <locale.h>
@@ -35,10 +36,10 @@ PulsePlugin::PulsePlugin (string init_Name, string init_audiobackend, bool init_
 	noServer = init_noServer;
 	stopped = init_stopped;
 
-	start();
+	initialize();
 }
 
-void PulsePlugin::start()
+void PulsePlugin::initialize()
 {
 	mainLoop = pa_threaded_mainloop_new();
 	pa_threaded_mainloop_start ( mainLoop );
@@ -111,64 +112,70 @@ void PulsePlugin::addDeviceToList ( vector< string* >* devicesList, string *devi
 
 void PulsePlugin::streamStatusCB ( pa_stream *stream, PulseAudioStream *th )
 {
-	if ( pa_stream_get_state ( stream ) == PA_STREAM_READY )
-		th->streamStatus = PulseAudioStream::STREAM_READY;
-	else if ( pa_stream_get_state ( stream ) == PA_STREAM_TERMINATED )
+	if(th->isValid())
 	{
-		assert ( stream == th->stream );
-		th->streamStatus = PulseAudioStream::STREAM_DEAD;
+		if ( pa_stream_get_state ( stream ) == PA_STREAM_READY )
+			th->setStatus(READY);
+		else if ( pa_stream_get_state ( stream ) == PA_STREAM_TERMINATED )
+		{
+			assert ( stream == th->stream );
+			th->setStatus(DEAD);
+		}
 	}
 }
 
 void PulsePlugin::streamWriteCB ( pa_stream *stream, size_t askedData, PulseAudioStream *th )
 {
-	//If paused, don't do anything
-	if(th->paused())
+	if(th->isValid())
 	{
-	  return;
-	}
-	
-	int16_t *dest;
-	//Get buffer size
-	size_t frameSize = askedData;
-	//Write data until we have space on the server and we have data available
-	uint32_t totalWritten = 0;
-	pa_stream_begin_write ( stream, ( void** ) &dest, &frameSize );
-	if ( frameSize == 0 ) //The server can't accept any data now
-		return;
-	do
-	{
-		uint32_t retSize = th->decoder->copyFrame ( dest + ( totalWritten / 2 ), frameSize );
-		if ( retSize == 0 ) //There is no more data
-			break;
-		totalWritten += retSize;
-		frameSize -= retSize;
-	}
-	while ( frameSize );
-
-	if ( totalWritten )
-		pa_stream_write ( stream, dest, totalWritten, NULL, 0, PA_SEEK_RELATIVE );
-	else
-		pa_stream_cancel_write ( stream );
-	//If the server asked for more data we have to sent it the inefficient way
-	if ( totalWritten < askedData )
-	{
-		uint32_t restBytes = askedData - totalWritten;
-		totalWritten = 0;
-		dest = new int16_t[restBytes/2];
+		//If paused, don't do anything
+		if(th->paused())
+		{
+		  return;
+		}
+		
+		int16_t *dest;
+		//Get buffer size
+		size_t frameSize = askedData;
+		//Write data until we have space on the server and we have data available
+		uint32_t totalWritten = 0;
+		pa_stream_begin_write ( stream, ( void** ) &dest, &frameSize );
+		if ( frameSize == 0 ) //The server can't accept any data now
+			return;
 		do
 		{
-			uint32_t retSize = th->decoder->copyFrame ( dest + ( totalWritten / 2 ), restBytes );
+			uint32_t retSize = th->decoder->copyFrame ( dest + ( totalWritten / 2 ), frameSize );
 			if ( retSize == 0 ) //There is no more data
 				break;
 			totalWritten += retSize;
-			restBytes -= retSize;
+			frameSize -= retSize;
 		}
-		while ( restBytes );
-		pa_stream_write ( stream, dest, totalWritten, NULL, 0, PA_SEEK_RELATIVE );
-		delete[] dest;
+		while ( frameSize );
+
+		if ( totalWritten )
+			pa_stream_write ( stream, dest, totalWritten, NULL, 0, PA_SEEK_RELATIVE );
+		else
+			pa_stream_cancel_write ( stream );
+		//If the server asked for more data we have to sent it the inefficient way
+		if ( totalWritten < askedData )
+		{
+			uint32_t restBytes = askedData - totalWritten;
+			totalWritten = 0;
+			dest = new int16_t[restBytes/2];
+			do
+			{
+				uint32_t retSize = th->decoder->copyFrame ( dest + ( totalWritten / 2 ), restBytes );
+				if ( retSize == 0 ) //There is no more data
+					break;
+				totalWritten += retSize;
+				restBytes -= retSize;
+			}
+			while ( restBytes );
+			pa_stream_write ( stream, dest, totalWritten, NULL, 0, PA_SEEK_RELATIVE );
+			delete[] dest;
+		}
+		pa_stream_cork ( stream, 0, NULL, NULL ); //Start the stream, just in case it's still stopped
 	}
-	pa_stream_cork ( stream, 0, NULL, NULL ); //Start the stream, just in case it's still stopped
 }
 
 bool PulsePlugin::isTimingAvailable() const
@@ -193,7 +200,7 @@ void PulsePlugin::freeStream ( AudioStream *audioStream )
 	audioStream = NULL;
 
 	pulseUnlock();
-	while ( s->streamStatus != PulseAudioStream::STREAM_DEAD );
+	while ( s->getStatus() != DEAD);
 	pulseLock();
 	if ( s->stream )
 		pa_stream_unref ( s->stream );
@@ -250,7 +257,7 @@ AudioStream *PulsePlugin::createStream ( AudioDecoder *decoder )
 	else
 	{
 		//Create the stream as dead
-		audioStream->streamStatus = PulseAudioStream::STREAM_DEAD;
+		audioStream->setStatus(DEAD);
 	}
 	return audioStream;
 }
@@ -267,7 +274,7 @@ void PulsePlugin::contextStatusCB ( pa_context *context, PulsePlugin *th )
 	case PA_CONTEXT_TERMINATED:
 		th->noServer = true;
 		th->contextReady = false; //In case something went wrong and the context is not correctly set
-		th->stop(); //It should stop if the context can't be set
+		th->terminate(); //It should stop if the context can't be set
 		LOG(LOG_ERROR,_("Connection to PulseAudio server failed"));
 		break;
 	default:
@@ -276,23 +283,29 @@ void PulsePlugin::contextStatusCB ( pa_context *context, PulsePlugin *th )
 }
 void PulsePlugin::pauseStream(AudioStream *audioStream)
 {
-	PulseAudioStream *pulseStream = NULL;
-	pulseStream = static_cast<PulseAudioStream *> ( audioStream );
-	if(pulseStream->isValid() && !pulseStream->paused())
+	if(audioStream->isValid())
 	{
-		pa_stream_cork(pulseStream->stream, 1, NULL, NULL);	//This will stop the stream's time from running
-		pulseStream->pause=true;
+		PulseAudioStream *pulseStream = NULL;
+		pulseStream = static_cast<PulseAudioStream *> ( audioStream );
+		if(!pulseStream->paused())
+		{
+			pa_stream_cork(pulseStream->stream, 1, NULL, NULL);	//This will stop the stream's time from running
+			pulseStream->setStatus(PAUSED);
+		}
 	}
 }
 
 void PulsePlugin::resumeStream(AudioStream *audioStream)
 {
-	PulseAudioStream *pulseStream = NULL;
-	pulseStream = static_cast<PulseAudioStream *> ( audioStream );
-	if(pulseStream->isValid() && pulseStream->paused())
+	if(audioStream->isValid())
 	{
-		pa_stream_cork(pulseStream->stream, 0, NULL, NULL);	//This will restart time
-		pulseStream->pause=false;
+		PulseAudioStream *pulseStream = NULL;
+		pulseStream = static_cast<PulseAudioStream *> ( audioStream );
+		if(pulseStream->paused())
+		{
+			pa_stream_cork(pulseStream->stream, 0, NULL, NULL);	//This will restart time
+			pulseStream->setStatus(PLAYING);
+		}
 	}
 }
 
@@ -313,10 +326,10 @@ bool PulsePlugin::serverAvailable() const
 
 PulsePlugin::~PulsePlugin()
 {
-	stop();
+	terminate();
 }
 
-void PulsePlugin::stop()
+void PulsePlugin::terminate()
 {
 	if ( !stopped )
 	{
@@ -343,14 +356,14 @@ void PulsePlugin::stop()
 Stream's functions
 ****************************/
 PulseAudioStream::PulseAudioStream ( PulsePlugin* m )  : 
-	AudioStream(NULL, false), stream ( NULL ), manager ( m ), streamStatus ( STREAM_STARTING )
+	AudioStream(NULL, STARTING), stream ( NULL ), manager ( m )
 {
 
 }
 
 uint32_t PulseAudioStream::getPlayedTime ( )
 {
-	if ( streamStatus != STREAM_READY ) //The stream is not yet ready, delay upload
+	if ( status != READY ) //The stream is not yet ready, delay upload
 		return 0;
 
 	manager->pulseLock();
@@ -372,7 +385,7 @@ void PulseAudioStream::fill ()
 {
 	if ( isValid() )
 	{
-		if ( streamStatus != PulseAudioStream::STREAM_READY ) //The stream is not yet ready, delay upload
+		if ( status != READY ) //The stream is not yet ready, delay upload
 			return;
 		if ( !decoder->hasDecodedFrames() ) //No decoded data available yet, delay upload
 			return;
@@ -418,15 +431,21 @@ void PulseAudioStream::fill ()
 
 bool PulseAudioStream::paused()
 {
-	assert_and_throw(isValid());
-	return pa_stream_is_corked(stream);
+	if( isValid() )	//If the stream is dead, it should always returns false since it can't be paused
+	{
+		return status == PAUSED;
+	}
+	else
+	{
+		return false;
+	}
 }
 
+//Always verify if a stream is dead before playing with it
 bool PulseAudioStream::isValid()
 {
-	return streamStatus != STREAM_DEAD;
+	return status != DEAD;
 }
-
 
 // Plugin factory function
 extern "C" DLL_PUBLIC IPlugin *create()

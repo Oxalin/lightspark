@@ -35,8 +35,8 @@ private:
 	pa_threaded_mainloop *mainLoop;
 	pa_context *context;
 	static void contextStatusCB ( pa_context *context, PulsePlugin *th );
-	void start();
-	void stop();
+	void initialize();
+	void terminate();
 	static void playbackListCB ( pa_context *context, const pa_sink_info *list, int eol, void *th );
 	static void captureListCB ( pa_context *context, const pa_source_info *list, int eol, void *th );
 	void addDeviceToList ( std::vector<std::string *> *devicesList, std::string *deviceName );
@@ -63,7 +63,6 @@ public:
 class PulseAudioStream: public AudioStream
 {
   public:
-	enum STREAM_STATUS { STREAM_STARTING = 0, STREAM_READY = 1, STREAM_DEAD = 2 };
 	PulseAudioStream ( PulsePlugin *m );
 	uint32_t getPlayedTime ();
 	bool paused();
@@ -73,7 +72,6 @@ class PulseAudioStream: public AudioStream
 //  private:
 	pa_stream *stream;
 	PulsePlugin *manager;
-	volatile STREAM_STATUS streamStatus;
     
 };
 
