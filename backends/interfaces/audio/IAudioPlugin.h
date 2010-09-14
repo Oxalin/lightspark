@@ -42,7 +42,8 @@ class AudioStream
 	virtual void setStatus(STREAM_STATUS streamStatus);	//Set the stream status
 	virtual STREAM_STATUS getStatus();	//Get the stream status
 	virtual uint32_t getPlayedTime() = 0;
-	virtual void fill() = 0;
+	virtual void fill() = 0;	//Fill the stream without playing it
+	virtual void empty() = 0;	//Empty the stream
 	virtual ~AudioStream() {};
 };
 
