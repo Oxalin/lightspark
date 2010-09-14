@@ -398,7 +398,7 @@ void PulseAudioStream::fill ()
 			manager->pulseUnlock();
 			return;
 		}
-		//Write data until we have space on the server and we have data available
+		//Write data as long as we have space on the server and we have data available
 		uint32_t totalWritten = 0;
 		pa_stream_begin_write ( stream, ( void** ) &dest, &frameSize );
 		do
@@ -439,6 +439,11 @@ bool PulseAudioStream::paused()
 	{
 		return false;
 	}
+}
+
+void PulseAudioStream::empty()
+{
+//To be completed
 }
 
 //Always verify if a stream is dead before playing with it

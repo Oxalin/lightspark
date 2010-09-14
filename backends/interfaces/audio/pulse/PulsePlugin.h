@@ -34,23 +34,23 @@ class PulsePlugin : public IAudioPlugin
 private:
 	pa_threaded_mainloop *mainLoop;
 	pa_context *context;
-	static void contextStatusCB ( pa_context *context, PulsePlugin *th );
+	static void contextStatusCB( pa_context *context, PulsePlugin *th );
 	void initialize();
 	void terminate();
-	static void playbackListCB ( pa_context *context, const pa_sink_info *list, int eol, void *th );
-	static void captureListCB ( pa_context *context, const pa_source_info *list, int eol, void *th );
-	void addDeviceToList ( std::vector<std::string *> *devicesList, std::string *deviceName );
-	void generateDevicesList ( std::vector<std::string *> *devicesList, DEVICE_TYPES desiredType ); //To populate the devices lists, devicesType must be playback or capture
-	static void streamStatusCB ( pa_stream *stream, PulseAudioStream *th );
-	static void streamWriteCB ( pa_stream *stream, size_t nbytes, PulseAudioStream *th );
+	static void playbackListCB( pa_context *context, const pa_sink_info *list, int eol, void *th );
+	static void captureListCB( pa_context *context, const pa_source_info *list, int eol, void *th );
+	void addDeviceToList( std::vector<std::string *> *devicesList, std::string *deviceName );
+	void generateDevicesList( std::vector<std::string *> *devicesList, DEVICE_TYPES desiredType );  //To populate the devices lists, devicesType must be playback or capture
+	static void streamStatusCB( pa_stream *stream, PulseAudioStream *th );
+	static void streamWriteCB( pa_stream *stream, size_t nbytes, PulseAudioStream *th );
 	bool contextReady;
 	bool noServer;
 public:
-	PulsePlugin ( std::string init_Name = "Pulse plugin output only", std::string init_audiobackend = "pulse",
-		      bool init_contextReady = false, bool init_noServer = false, bool init_stopped = false );
-	void set_device ( std::string desiredDevice, DEVICE_TYPES desiredType );
-	AudioStream *createStream ( lightspark::AudioDecoder *decoder );
-	void freeStream ( AudioStream *audioStream );
+	PulsePlugin( std::string init_Name = "Pulse plugin output only", std::string init_audiobackend = "pulse",
+	             bool init_contextReady = false, bool init_noServer = false, bool init_stopped = false );
+	void set_device( std::string desiredDevice, DEVICE_TYPES desiredType );
+	AudioStream *createStream( lightspark::AudioDecoder *decoder );
+	void freeStream( AudioStream *audioStream );
 	void pauseStream( AudioStream *audioStream );
 	void resumeStream( AudioStream *audioStream );
 	bool isTimingAvailable() const;
@@ -62,17 +62,18 @@ public:
 
 class PulseAudioStream: public AudioStream
 {
-  public:
-	PulseAudioStream ( PulsePlugin *m );
-	uint32_t getPlayedTime ();
+public:
+	PulseAudioStream( PulsePlugin *m );
+	uint32_t getPlayedTime();
 	bool paused();
 	bool isValid();
-	void fill ();
+	void fill();
+	void empty();
 
 //  private:
 	pa_stream *stream;
 	PulsePlugin *manager;
-    
+
 };
 
 #endif
