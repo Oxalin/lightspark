@@ -48,7 +48,7 @@ private:
 public:
 	PulsePlugin( std::string init_Name = "Pulse plugin output only", std::string init_audiobackend = "pulse",
 	             bool init_contextReady = false, bool init_noServer = false, bool init_stopped = false );
-	void set_device( std::string desiredDevice, DEVICE_TYPES desiredType );
+	void setDevice( std::string desiredDevice, DEVICE_TYPES desiredType );
 	AudioStream *createStream( lightspark::AudioDecoder *decoder );
 	void freeStream( AudioStream *audioStream );
 	void pauseStream( AudioStream *audioStream );

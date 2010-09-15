@@ -51,7 +51,7 @@ void PulsePlugin::initialize()
 	pulseUnlock();
 }
 
-void PulsePlugin::set_device ( string desiredDevice, DEVICE_TYPES desiredType )
+void PulsePlugin::setDevice ( string desiredDevice, DEVICE_TYPES desiredType )
 {
 	playbackDeviceName = desiredDevice;
 	pulseLock();

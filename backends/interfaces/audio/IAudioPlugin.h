@@ -32,7 +32,7 @@ enum STREAM_STATUS { STARTING = 0, READY, DEAD, PLAYING, PAUSED, STOPPED };
 class AudioStream
 {
   protected:
-	volatile STREAM_STATUS status;	//Indicates the stream status
+	STREAM_STATUS status;	//Indicates the stream status
 	AudioStream(lightspark::AudioDecoder *dec = NULL, STREAM_STATUS initStatus = STARTING);
 
   public:
@@ -64,9 +64,9 @@ protected:
 
 public:
 	enum DEVICE_TYPES { PLAYBACK, CAPTURE };
-	virtual std::vector<std::string *> *get_devicesList ( DEVICE_TYPES desiredType );
-	virtual void set_device ( std::string desiredDevice, DEVICE_TYPES desiredType ) = 0;
-	virtual std::string get_device ( DEVICE_TYPES desiredType );
+	virtual std::vector<std::string *> *getDevicesList ( DEVICE_TYPES desiredType );
+	virtual void setDevice ( std::string desiredDevice, DEVICE_TYPES desiredType ) = 0;
+	virtual std::string getDevice ( DEVICE_TYPES desiredType );
 	virtual AudioStream *createStream ( lightspark::AudioDecoder *decoder ) = 0;
 	virtual void freeStream ( AudioStream *audioStream ) = 0;
 	virtual void pauseStream( AudioStream *audioStream ) = 0;	//Pause the stream (stops time from running, cork)
