@@ -84,7 +84,9 @@ public:
 	ALuint	freq;
 
   private:
-	void fillBuffer(ALuint buffer);
+	void fillBuffer(ALuint *buffer);
 };
+
+bool checkALError();
 
 #endif
