@@ -30,7 +30,7 @@ IAudioPlugin::IAudioPlugin ( string plugin_name, string backend_name, bool init_
 
 }
 
-string IAudioPlugin::get_device ( DEVICE_TYPES desiredType )
+string IAudioPlugin::getDevice ( DEVICE_TYPES desiredType )
 {
 	if ( PLAYBACK )
 	{
@@ -46,7 +46,7 @@ string IAudioPlugin::get_device ( DEVICE_TYPES desiredType )
 	}
 }
 
-vector< string* > *IAudioPlugin::get_devicesList ( DEVICE_TYPES desiredType )
+vector< string* > *IAudioPlugin::getDevicesList ( DEVICE_TYPES desiredType )
 {
 	if ( desiredType == PLAYBACK )
 	{
@@ -68,8 +68,18 @@ IAudioPlugin::~IAudioPlugin()
 }
 
 
-AudioStream::AudioStream ( lightspark::AudioDecoder* dec, bool initPause ):
-	decoder(NULL), pause(initPause)
+AudioStream::AudioStream ( lightspark::AudioDecoder* dec, STREAM_STATUS initStatus ):
+	decoder(NULL), status(initStatus)
 {
 
+}
+
+void AudioStream::setStatus(STREAM_STATUS streamStatus)
+{
+	status = streamStatus;
+}
+
+STREAM_STATUS AudioStream::getStatus()
+{
+	return status;
 }

@@ -26,17 +26,24 @@
 #include "../IPlugin.h"
 #include <iostream>
 
+
+enum STREAM_STATUS { STARTING = 0, READY, DEAD, PLAYING, PAUSED, STOPPED };
+
 class AudioStream
 {
   protected:
-	AudioStream(lightspark::AudioDecoder *dec = NULL, bool initPause = false);
+	STREAM_STATUS status;	//Indicates the stream status
+	AudioStream(lightspark::AudioDecoder *dec = NULL, STREAM_STATUS initStatus = STARTING);
 
   public:
 	lightspark::AudioDecoder *decoder;
-	bool pause;	//Indicates whether the stream is paused as a result of pauseStream being called
 	virtual bool paused() = 0;	//Is the stream paused? (corked)
+	virtual bool isValid() = 0;	//Is the stream alive, fully working?
+	virtual void setStatus(STREAM_STATUS streamStatus);	//Set the stream status
+	virtual STREAM_STATUS getStatus();	//Get the stream status
 	virtual uint32_t getPlayedTime() = 0;
-	virtual void fill() = 0;
+	virtual void fill() = 0;	//Fill the stream without playing it
+	virtual void empty() = 0;	//Empty the stream
 	virtual ~AudioStream() {};
 };
 
@@ -57,9 +64,9 @@ protected:
 
 public:
 	enum DEVICE_TYPES { PLAYBACK, CAPTURE };
-	virtual std::vector<std::string *> *get_devicesList ( DEVICE_TYPES desiredType );
-	virtual void set_device ( std::string desiredDevice, DEVICE_TYPES desiredType ) = 0;
-	virtual std::string get_device ( DEVICE_TYPES desiredType );
+	virtual std::vector<std::string *> *getDevicesList ( DEVICE_TYPES desiredType );
+	virtual void setDevice ( std::string desiredDevice, DEVICE_TYPES desiredType ) = 0;
+	virtual std::string getDevice ( DEVICE_TYPES desiredType );
 	virtual AudioStream *createStream ( lightspark::AudioDecoder *decoder ) = 0;
 	virtual void freeStream ( AudioStream *audioStream ) = 0;
 	virtual void pauseStream( AudioStream *audioStream ) = 0;	//Pause the stream (stops time from running, cork)
