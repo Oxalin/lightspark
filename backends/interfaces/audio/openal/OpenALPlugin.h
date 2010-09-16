@@ -84,7 +84,12 @@ public:
 	ALuint	freq;
 
   private:
+	bool terminated;
+	pthread_t ALThread;
 	void fillBuffer(ALuint *buffer);
+	void execute();		//starting feeding thread
+	void threadAbort();	//stopping feeding thread
+	void wait();
 };
 
 bool checkALError();

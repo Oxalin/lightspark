@@ -345,14 +345,55 @@ OpenALAudioStream::OpenALAudioStream( OpenALPlugin* m ):
 	alSource3f( pbSource, AL_DIRECTION, 0.0, 0.0, 0.0 );
 	alSourcef( pbSource, AL_ROLLOFF_FACTOR, 0.0 );
 	alSourcei( pbSource, AL_SOURCE_RELATIVE, AL_TRUE );
+	
+	pthread_create(&ALThread, NULL, (thread_worker)execute, this);
 }
 
 OpenALAudioStream::~OpenALAudioStream()
 {
+	wait();		//stopping feeding thread
 	empty();	//Emptying the stream, so all buffers are PENDING
 	
 	alDeleteSources(NUM_SOURCES, &pbSource);
 	alDeleteBuffers(NUM_BUFFERS, pbBuffers);
+}
+
+void OpenALAudioStream::wait()
+{
+	if(!terminated)
+	{
+		pthread_join(ALThread,NULL);
+	}
+	terminated = true;
+}
+
+void OpenALAudioStream::execute()
+{
+	while(!terminated)
+	{
+		switch(status)
+		{
+			case READY:
+			case PLAYING:
+			case PAUSED:
+			{
+				fill();
+				break;
+			}  
+			case STARTING:
+			case DEAD:
+			case STOPPED:
+			default:
+			{
+				break;
+			}
+		}
+	}
+}
+
+void OpenALAudioStream::threadAbort()
+{
+
 }
 
 uint32_t OpenALAudioStream::getPlayedTime()
