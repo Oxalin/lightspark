@@ -190,12 +190,12 @@ private:
 		@pre engine and useAVM2 are known
 	*/
 	void createEngines();
-	/**
-	  	Destroys all the engines used in lightspark: timer, thread pool, vm...
-	*/
 #ifdef COMPILE_PLUGIN
 	static void delayedCreation(SystemState* th);
 #endif
+	/**
+	  	Destroys all the engines used in lightspark: timer, thread pool, vm...
+	*/
 	void stopEngines();
 	//Useful to wait for complete download of the SWF
 	Semaphore fileDumpAvailable;
