@@ -53,7 +53,8 @@ public:
 	void freeStreamPlugin ( AudioStream *audioStream );
 	bool isTimingAvailablePlugin() const;
 	void pauseStreamPlugin( AudioStream *audioStream );	//Pause the stream (stops time from running, cork)
-	void resumeStreamPlugin( AudioStream *audioStream );	//Resume the stream (restart time, uncork)
+	void playStreamPlugin( AudioStream *audioStream);	//Play the stream or resume it if it was paused (restart time, uncork)
+	void stopStreamPlugin( AudioStream *audioStream);	//Stop the stream and reinitialize it
 	void set_audiobackend ( std::string desired_backend );
 	void get_audioBackendsList();
 	void refresh_audioplugins_list();

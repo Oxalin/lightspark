@@ -92,11 +92,24 @@ void AudioManager::pauseStreamPlugin( AudioStream *audioStream )
 
 }
 
-void AudioManager::resumeStreamPlugin( AudioStream *audioStream )
+void AudioManager::playStreamPlugin( AudioStream *audioStream )
 {
 	if ( oAudioPlugin != NULL )
 	{
-		oAudioPlugin->resumeStream ( audioStream );
+		oAudioPlugin->playStream( audioStream );
+	}
+	else
+	{
+		LOG ( LOG_ERROR, _ ( "No audio plugin loaded, can't play/resume stream" ) );
+	}
+
+}
+
+void AudioManager::stopStreamPlugin( AudioStream *audioStream )
+{
+	if ( oAudioPlugin != NULL )
+	{
+		oAudioPlugin->stopStream( audioStream );
 	}
 	else
 	{

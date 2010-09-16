@@ -41,7 +41,7 @@ class AudioStream
 	virtual bool isValid() = 0;	//Is the stream alive, fully working?
 	virtual void setStatus(STREAM_STATUS streamStatus);	//Set the stream status
 	virtual STREAM_STATUS getStatus();	//Get the stream status
-	virtual uint32_t getPlayedTime() = 0;
+	virtual uint32_t getPlayedTime() = 0;	//Get the time played in milliseconds
 	virtual void fill() = 0;	//Fill the stream without playing it
 	virtual void empty() = 0;	//Empty the stream
 	virtual ~AudioStream() {};
@@ -70,7 +70,9 @@ public:
 	virtual AudioStream *createStream ( lightspark::AudioDecoder *decoder ) = 0;
 	virtual void freeStream ( AudioStream *audioStream ) = 0;
 	virtual void pauseStream( AudioStream *audioStream ) = 0;	//Pause the stream (stops time from running, cork)
-	virtual void resumeStream( AudioStream *audioStream ) = 0;	//Resume the stream (restart time, uncork)
+//	virtual void resumeStream( AudioStream *audioStream ) = 0;	//Resume the stream (restart time, uncork)
+	virtual void playStream( AudioStream *audioStream ) = 0;	//Start playing the stream
+	virtual void stopStream( AudioStream *audioStream ) = 0;	//Stop playing the stream and reinitialize it
 	virtual bool isTimingAvailable() const = 0;
 	virtual ~IAudioPlugin();
 };
