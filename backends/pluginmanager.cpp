@@ -231,7 +231,9 @@ int32_t PluginManager::findPluginInList ( string desiredname, string desiredback
 			return index;
 		}
 	}
-	LOG ( LOG_ERROR, _ ( "findPluginInList: no plugin found in list" ) );
+	#ifdef DEBUG
+	LOG ( LOG_NO_INFO, _ ( "findPluginInList: no plugin found in list with searched options." ) );
+	#endif
 	return -1;
 }
 

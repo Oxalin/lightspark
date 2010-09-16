@@ -134,7 +134,7 @@ void PulsePlugin::streamWriteCB ( pa_stream *stream, size_t askedData, PulseAudi
 		  return;
 		}
 		
-		int16_t *dest;
+		int16_t *dest = NULL;
 		//Get buffer size
 		size_t frameSize = askedData;
 		//Write data until we have space on the server and we have data available
@@ -208,21 +208,6 @@ void PulsePlugin::freeStream ( AudioStream *audioStream )
 	delete s;
 }
 
-void overflow_notify()
-{
-	cout << "____overflow!!!!" << endl;
-}
-
-void underflow_notify()
-{
-	cout << "____underflow!!!!" << endl;
-}
-
-void started_notify()
-{
-	cout << "____started!!!!" << endl;
-}
-
 AudioStream *PulsePlugin::createStream ( AudioDecoder *decoder )
 {
 	PulseAudioStream *audioStream = new PulseAudioStream( this );
@@ -285,8 +270,7 @@ void PulsePlugin::pauseStream(AudioStream *audioStream)
 {
 	if(audioStream->isValid())
 	{
-		PulseAudioStream *pulseStream = NULL;
-		pulseStream = static_cast<PulseAudioStream *> ( audioStream );
+		PulseAudioStream *pulseStream = static_cast<PulseAudioStream *> ( audioStream );
 		if(!pulseStream->paused())
 		{
 			pa_stream_cork(pulseStream->stream, 1, NULL, NULL);	//This will stop the stream's time from running
@@ -295,18 +279,23 @@ void PulsePlugin::pauseStream(AudioStream *audioStream)
 	}
 }
 
-void PulsePlugin::resumeStream(AudioStream *audioStream)
+void PulsePlugin::playStream(AudioStream* audioStream)
 {
 	if(audioStream->isValid())
 	{
-		PulseAudioStream *pulseStream = NULL;
-		pulseStream = static_cast<PulseAudioStream *> ( audioStream );
+		PulseAudioStream *pulseStream = static_cast<PulseAudioStream *> ( audioStream );
 		if(pulseStream->paused())
 		{
 			pa_stream_cork(pulseStream->stream, 0, NULL, NULL);	//This will restart time
 			pulseStream->setStatus(PLAYING);
 		}
 	}
+}
+
+//Stop the stream and reinitialize it
+void PulsePlugin::stopStream(AudioStream* audioStream)
+{
+	//To be modified
 }
 
 void PulsePlugin::pulseLock()
@@ -351,7 +340,6 @@ void PulsePlugin::terminate()
 }
 
 
-
 /****************************
 Stream's functions
 ****************************/
@@ -363,21 +351,26 @@ PulseAudioStream::PulseAudioStream ( PulsePlugin* m )  :
 
 uint32_t PulseAudioStream::getPlayedTime ( )
 {
-	if ( status != READY ) //The stream is not yet ready, delay upload
-		return 0;
+	pa_usec_t time = 0;
 
-	manager->pulseLock();
-	//Request updated timing info
-	pa_operation* timeUpdate = pa_stream_update_timing_info ( stream, NULL, NULL );
-	manager->pulseUnlock();
-	while ( pa_operation_get_state ( timeUpdate ) != PA_OPERATION_DONE );
-	manager->pulseLock();
-	pa_operation_unref ( timeUpdate );
+	if( isValid() )
+	{
+		if ( status != STARTING ) //Is the stream ready
+		{
+			manager->pulseLock();
+			//Request updated timing info
+			pa_operation* timeUpdate = pa_stream_update_timing_info ( stream, NULL, NULL );
+			manager->pulseUnlock();
+			while ( pa_operation_get_state ( timeUpdate ) != PA_OPERATION_DONE );
+			manager->pulseLock();
+			pa_operation_unref ( timeUpdate );
 
-	pa_usec_t time;
-	pa_stream_get_time ( stream, &time );
+			pa_stream_get_time ( stream, &time );
 
-	manager->pulseUnlock();
+			manager->pulseUnlock();
+		}
+	}
+
 	return time / 1000;
 }
 
@@ -433,7 +426,7 @@ bool PulseAudioStream::paused()
 {
 	if( isValid() )	//If the stream is dead, it should always returns false since it can't be paused
 	{
-		return status == PAUSED;
+		return pa_stream_is_corked( stream );
 	}
 	else
 	{
@@ -450,6 +443,21 @@ void PulseAudioStream::empty()
 bool PulseAudioStream::isValid()
 {
 	return status != DEAD;
+}
+
+void overflow_notify()
+{
+	cout << "____overflow!!!!" << endl;
+}
+
+void underflow_notify()
+{
+	cout << "____underflow!!!!" << endl;
+}
+
+void started_notify()
+{
+	cout << "____started!!!!" << endl;
 }
 
 // Plugin factory function

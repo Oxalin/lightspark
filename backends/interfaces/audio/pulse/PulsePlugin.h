@@ -52,7 +52,8 @@ public:
 	AudioStream *createStream( lightspark::AudioDecoder *decoder );
 	void freeStream( AudioStream *audioStream );
 	void pauseStream( AudioStream *audioStream );
-	void resumeStream( AudioStream *audioStream );
+	void playStream( AudioStream *audioStream);
+	void stopStream( AudioStream *audioStream);
 	bool isTimingAvailable() const;
 	void pulseLock();
 	void pulseUnlock();
@@ -70,10 +71,13 @@ public:
 	void fill();
 	void empty();
 
-//  private:
 	pa_stream *stream;
 	PulsePlugin *manager;
 
 };
+
+void overflow_notify();
+void underflow_notify();
+void started_notify();
 
 #endif

@@ -599,7 +599,7 @@ void NetStream::tick()
 	//If sound is enabled, and the stream is not paused anymore, resume the sound stream. This will restart time.
 	else if(audioStream && audioStream->isValid() && audioStream->paused())
 	{
-		sys->audioManager->resumeStreamPlugin(audioStream);
+		sys->audioManager->playStreamPlugin(audioStream);
 	}
 
 	//Advance video and audio to current time, follow the audio stream time
@@ -608,6 +608,7 @@ void NetStream::tick()
 	{
 		assert(audioDecoder);
 		streamTime=audioStream->getPlayedTime();
+		audioStream->fill();
 	}
 	else
 	{
