@@ -55,8 +55,7 @@ void OpenALPlugin::initCapture( OpenALPlugin *th )
 
 	if ( !th->captureDevice )	//verify capture device could be opened
 	{
-		checkALError();
-		cout << "Error while initializing capture device." << endl;
+		checkALError("Error while initializing capture device.");
 	}
 }
 
@@ -76,14 +75,12 @@ void OpenALPlugin::initPlayback( OpenALPlugin *th )
 		else
 		{
 			contextReady = false;
-			checkALError();
-			cout << "Error while initializing context." << endl;
+			checkALError("Error while initializing context.");
 		}
 	}
 	else
 	{
-		checkALError();
-		cout << "Error while initializing playback device." << endl;
+		checkALError("Error while initializing playback device.");
 	}
 }
 
@@ -99,7 +96,7 @@ void OpenALPlugin::freeStream( AudioStream* audioStream )
 
 	do
 	{
-		alSourcei(ALStream->pbSource, AL_SOURCE_STATE, state);
+		alGetSourcei( ALStream->pbSource, AL_SOURCE_STATE, &state);
 	}
 	while ( state != AL_STOPPED);
 
@@ -109,36 +106,77 @@ void OpenALPlugin::freeStream( AudioStream* audioStream )
 
 bool OpenALPlugin::isTimingAvailable() const
 {
-	return true;	//to be modified later
+	return contextReady;
 }
 
 void OpenALPlugin::pauseStream( AudioStream* audioStream )
 {
-	OpenALAudioStream *ALStream = static_cast<OpenALAudioStream *>( audioStream );
+	if(audioStream->isValid())
+	{
+		ALint state = AL_INITIAL;
+		OpenALAudioStream *ALStream = static_cast<OpenALAudioStream *>( audioStream );
 
-	//Pause source
-	alSourcePause( ALStream->pbSource );
-	ALStream->setStatus(PAUSED);
-
+		//Query source state
+		alGetSourcei( ALStream->pbSource, AL_SOURCE_STATE, &state);
+		
+		if(state == AL_PLAYING)	//Pause source
+		{
+			alSourcePause( ALStream->pbSource );
+			ALStream->setStatus(PAUSED);
+		}
+	}
 }
 
-void OpenALPlugin::resumeStream( AudioStream* audioStream )
+void OpenALPlugin::playStream( AudioStream* audioStream )
 {
-	OpenALAudioStream *ALStream = static_cast<OpenALAudioStream *>( audioStream );
+	if( audioStream->isValid() )
+	{
+		ALint state = AL_INITIAL;
+		OpenALAudioStream *ALStream = static_cast<OpenALAudioStream *>( audioStream );
 
-	//Resume context?
-//	alcProcessContext(context);
+		//Associate and fill stream's buffers
+		ALStream->fill();
 
-	//Resume source
-	alSourcePlay( ALStream->pbSource );
-	ALStream->setStatus(PLAYING);
+		//Query source state
+		alGetSourcei( ALStream->pbSource, AL_SOURCE_STATE, &state);
+		
+		if( state == AL_PLAYING )	//Is the stream already playing?
+		{
+			return;
+		}
+		else	//Start playing the stream from where it is
+		{
+			alSourcePlay( ALStream->pbSource );
+			ALStream->setStatus(PLAYING);
+			#ifdef DEBUG
+			cout << "Playing stream." << endl;
+			#endif
+		}
+	}
 }
-/*
-bool OpenALPlugin::serverAvailable() const
+
+void OpenALPlugin::stopStream(AudioStream* audioStream)
 {
-	return contextReady;
+	if(audioStream->isValid())
+	{
+		ALint state = AL_INITIAL;
+		OpenALAudioStream *ALStream = static_cast<OpenALAudioStream *>( audioStream );
+
+		//Query source state
+		alGetSourcei( ALStream->pbSource, AL_SOURCE_STATE, &state);
+		
+		if( (state == AL_PLAYING) || (state == AL_PAUSED))	//Stop stream and reinitialize it
+		{
+			alSourceStop( ALStream-> pbSource );
+			ALStream->empty();
+			ALStream->setStatus(STOPPED);
+			#ifdef DEBUG
+			cout << "Stream stopped." << endl;
+			#endif
+		}
+	}
 }
-*/
+
 AudioStream *OpenALPlugin::createStream( AudioDecoder *decoder )
 {
 	OpenALAudioStream *ALStream = new OpenALAudioStream( this );
@@ -162,9 +200,13 @@ AudioStream *OpenALPlugin::createStream( AudioDecoder *decoder )
 		}
 		else
 		{
+			#ifdef DEBUG
 			cout << "Unsupported number of channels: " << decoder->channelCount << endl;
+			#endif
 			ALStream->setStatus( DEAD );
 		}
+		
+		ALStream->setStatus(PAUSED);
 	}
 	else
 	{
@@ -212,7 +254,7 @@ void OpenALPlugin::addDeviceToList( std::vector< string* >* devicesList, string*
 }
 
 /**********************
-desiredDevice should be empty to use the default. Else, it should be the name of the device.
+desiredDeviceName should be empty to use the default. Else, it should be the name of the device.
 When setting a device, we should check if there is a context active using the current device
   If so, suspend it, unload previous device, load the new one, update the context and restart it
 **********************/
@@ -303,7 +345,6 @@ void OpenALPlugin::terminate()
 		context = NULL;
 
 		// Close devices (only when buffers and context are deleted
-
 		if ( playbackDevice != NULL )
 		{
 			alcCloseDevice( playbackDevice );
@@ -319,24 +360,20 @@ void OpenALPlugin::terminate()
 }
 
 OpenALAudioStream::OpenALAudioStream( OpenALPlugin* m ):
-		AudioStream( NULL, STARTING ), manager( m )
+		AudioStream( NULL, STARTING ), manager( m ), streamOffset(0), filling(false)
 {
 	alGenBuffers( NUM_BUFFERS, pbBuffers );
 
-	if ( checkALError() )
+	if ( checkALError("alGenBuffers.") )
 	{
-		cout << "alGenBuffers." << endl;
 		status = DEAD;
-//		setStatus(DEAD);
 	}
 
 	alGenSources( NUM_SOURCES, &pbSource );
 
-	if ( checkALError() )
+	if ( checkALError("Error in alGenSources.") )
 	{
-		cout << "Error in alGenSources." << endl;
 		status = DEAD;
-//		setStatus(DEAD);
 	}
 
 	//Setting default parameters for the source
@@ -346,114 +383,102 @@ OpenALAudioStream::OpenALAudioStream( OpenALPlugin* m ):
 	alSourcef( pbSource, AL_ROLLOFF_FACTOR, 0.0 );
 	alSourcei( pbSource, AL_SOURCE_RELATIVE, AL_TRUE );
 	
-	pthread_create(&ALThread, NULL, (thread_worker)execute, this);
+	status = READY;
 }
 
 OpenALAudioStream::~OpenALAudioStream()
 {
-	wait();		//stopping feeding thread
 	empty();	//Emptying the stream, so all buffers are PENDING
 	
 	alDeleteSources(NUM_SOURCES, &pbSource);
 	alDeleteBuffers(NUM_BUFFERS, pbBuffers);
 }
 
-void OpenALAudioStream::wait()
-{
-	if(!terminated)
-	{
-		pthread_join(ALThread,NULL);
-	}
-	terminated = true;
-}
-
-void OpenALAudioStream::execute()
-{
-	while(!terminated)
-	{
-		switch(status)
-		{
-			case READY:
-			case PLAYING:
-			case PAUSED:
-			{
-				fill();
-				break;
-			}  
-			case STARTING:
-			case DEAD:
-			case STOPPED:
-			default:
-			{
-				break;
-			}
-		}
-	}
-}
-
-void OpenALAudioStream::threadAbort()
-{
-
-}
-
 uint32_t OpenALAudioStream::getPlayedTime()
 {
+	ALint time = 0;
+	
 	if ( isValid() )
 	{
-		return 0;	//returns 0 for now, to be modified
+		ALint playedBytes = 0;
+		
+		alGetSourcei( pbSource, AL_BYTE_OFFSET, &playedBytes);	//Bytes played since the playing
+
+		//Every second, we consume 2Bytes (16bit) * NumChannel * freq (Hz)
+		time = playedBytes / (freq / 1000);	//freq / 1000 = milliseconds
+		if(format == AL_FORMAT_MONO16)
+		{
+			time /= 2;
+		}
+		else if(format == AL_FORMAT_STEREO16)
+		{
+			time /= 4;	//Consuming twice as much in stereo
+		}
 	}
-	else
-	{
-		return 0;
-	}
+
+	streamOffset += time;	//Adding played time to the streamOffset
+	#ifdef DEBUG
+	cout << "Played time (msec): " << streamOffset << endl;
+	#endif
+	return streamOffset;
 }
 
 void OpenALAudioStream::fill()
 {
 	if ( isValid() )
 	{
-		ALint numBuf;
+	  if(!filling)
+	  {
+		filling = true;
+		ALint freeBuf;
 		ALint queuedBuf;
+		ALint unqueuedBuf;
 		ALint processedBuf;
 		
 		alGetSourcei(pbSource, AL_BUFFERS_QUEUED, &queuedBuf);	//Are the buffers associated with the source
-		
-		if((queuedBuf == 0))	//First time we are filling buffers (starting the stream)
-		{
-			numBuf = NUM_BUFFERS;
-		}
-		else	//We have to use the queued buffers that are processed (refilling stream)
-		{
-			alGetSourcei(pbSource, AL_BUFFERS_PROCESSED, &processedBuf);	//Get the number of buffers processed (free to be used)
-			numBuf = processedBuf;
-		}
-		
-		uint32_t index = 0;
-		while(numBuf--)	//filling all free buffers one by one
-		{
-			ALuint *emptyBuffer = NULL;
-			
-			if(queuedBuf == 0)	//Buffers are not queued in the source yet
-			{
-				emptyBuffer = &pbBuffers[index];	//Pointing to the first new buffer to fill
-				index++;
-			}
-			else	//Reusing free queued buffers
-			{
-				alSourceUnqueueBuffers(pbSource, 1, emptyBuffer);
-				if ( checkALError() )
-				{
-					cout << "Error unqueuing buffer." << endl;
-				}
-			}
+		alGetSourcei(pbSource, AL_BUFFERS_PROCESSED, &processedBuf);	//Get the number of buffers processed (free to be used)
+		unqueuedBuf = NUM_BUFFERS - queuedBuf;	//Number of buffers still not associated to the source
 
-			fillBuffer(emptyBuffer);
-			alSourceQueueBuffers(pbSource, 1, emptyBuffer);
-			if( checkALError() )
+		freeBuf = processedBuf + unqueuedBuf;
+		uint32_t unqueuedIndex = NUM_BUFFERS - unqueuedBuf;
+
+		#ifdef DEBUG
+		cout << "Filling " << processedBuf << " processedBuf, " << unqueuedBuf << " unqueuedBuf." << endl;
+		#endif
+
+		while(freeBuf--)	//filling all free buffers one by one
+		{
+			if(unqueuedBuf > 0)	//First, use buffers that are not queued in the source yet
 			{
-				cout << "Error queuing buffer." << endl;
+				#ifdef DEBUG
+				cout << "Filling an unqueuedBuf." << endl;
+				#endif
+				fillBuffer(&pbBuffers[unqueuedIndex]);
+				alSourceQueueBuffers(pbSource, 1, &pbBuffers[unqueuedIndex]);
+				checkALError("Error queuing buffer.");
+				
+				unqueuedIndex++;
+				unqueuedBuf--;
+			}
+			else if(processedBuf > 0)	//Then, reuse free queued buffers
+			{
+				#ifdef DEBUG
+				cout << "Filling a processedBuf." << endl;
+				#endif
+
+				ALuint emptyBuffer;
+				alSourceUnqueueBuffers(pbSource, 1, &emptyBuffer);
+				checkALError("Error unqueuing buffer.");
+				
+				fillBuffer(&emptyBuffer);
+				alSourceQueueBuffers(pbSource, 1, &emptyBuffer);
+				checkALError("Error queuing buffer.");
+				
+				processedBuf--;
 			}
 		}
+		filling = false;
+	}
 	}
 	else
 	{
@@ -466,7 +491,7 @@ void OpenALAudioStream::fillBuffer( ALuint *buffer )
 {
 	assert(buffer);
 
-	int16_t *dest = NULL;
+	int16_t *dest = (int16_t *)malloc(BUFFER_SIZE);
 	uint32_t totalWritten = 0;
 	size_t frameSize = BUFFER_SIZE;
     
@@ -486,30 +511,27 @@ void OpenALAudioStream::fillBuffer( ALuint *buffer )
 	}
 	while(frameSize);	//Looping buffer as much data as possible
 
-	cout << "Filled " << totalWritten << endl;
+	cout << totalWritten << " bytes ready to be buffered." << endl;
 	if ( totalWritten )	//We have data to put in buffer
 	{
 		alBufferData(*buffer, format, dest, totalWritten, freq);
-		if ( checkALError() )
-		{
-			cout << "Error filling buffer." << endl;
-		}
+		checkALError("Error filling buffer.");
+
+		free(dest);
 	}
 }
 
+//Empty all buffers associated to the source and unqueue
 void OpenALAudioStream::empty()
 {
 	ALint numBuf;
 	ALuint buffer;
 	
-	alSourceStop(pbSource);		//Before emptying, we need to stop
+	alSourceStop(pbSource);		//Before emptying, we need to make sure the source is stop
 	alGetSourcei(pbSource, AL_BUFFERS_QUEUED, &numBuf);	//Get number of buffers queued attached
 	alSourceUnqueueBuffers(pbSource, numBuf, &buffer);	//Unqueues all buffers
 
-	if ( checkALError() )
-	{
-		cout << "Error emptying buffers from stream." << endl;
-	}
+	checkALError("Error emptying buffers from stream.");
 }
 
 //Check if the stream is paused
@@ -517,27 +539,43 @@ bool OpenALAudioStream::paused()
 {
 	if ( isValid() )
 	{
-		return status == PAUSED;
+		ALint state;
+		alGetSourcei( pbSource, AL_SOURCE_STATE, &state);
+
+		if( (status == PAUSED) || (state == AL_PAUSED) )
+		{
+		  #ifdef DEBUG
+		  cout << "paused() == true" << endl;
+		  #endif
+		  return true;
+		}
 	}
-	else
-	{
-		return false;
-	}
+
+	return false;
 }
 
 //Check if the stream is still alive
 bool OpenALAudioStream::isValid()
 {
-	return status != DEAD;
+	if( status != DEAD )
+	{
+	  #ifdef DEBUG
+	  cout << "isValid() == true" << endl;
+	  #endif
+	  return true;
+	}
+
+	return false;
 }
 
 //Check if there is an OpenAL error. If so, returns true
-bool checkALError()
+bool checkALError(string errorMessage)
 {
 	ALenum error;
 	
 	if ( ( error = alGetError() ) != AL_NO_ERROR )
 	{
+		cout << errorMessage << endl;
 		cout << "OpenAL error: " << error << endl;
 		return true;
 	}

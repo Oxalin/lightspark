@@ -45,7 +45,6 @@ private:
 	ALCcontext *context;
 	ALCdevice *playbackDevice;
 	ALCdevice *captureDevice;
-//	ALuint	environments[NUM_ENVIRONMENTS];
 	void initPlayback( OpenALPlugin *th );
 	void initCapture( OpenALPlugin *th );
 	void addDeviceToList ( std::vector<std::string *> *devicesList, std::string *deviceName );
@@ -53,7 +52,6 @@ private:
 	void initialize();
 	void terminate();
 	bool contextReady;
-//	bool noServer;
 public:
 	OpenALPlugin( std::string initName = "OpenAL plugin", std::string initAudiobackend = "openal",
 		      bool initContext = false, bool initStopped = false );
@@ -61,9 +59,9 @@ public:
 	AudioStream *createStream( lightspark::AudioDecoder *decoder );
 	void freeStream( AudioStream *audioStream );
 	void pauseStream( AudioStream *audioStream );
-	void resumeStream( AudioStream *audioStream );
+	void playStream( AudioStream *audioStream);
+	void stopStream( AudioStream *audioStream);
 	bool isTimingAvailable() const;
-//	bool serverAvailable() const;
 	~OpenALPlugin();
 };
 
@@ -84,14 +82,11 @@ public:
 	ALuint	freq;
 
   private:
-	bool terminated;
-	pthread_t ALThread;
+	ALint streamOffset;	//Offset since the begin of the stream in msec
 	void fillBuffer(ALuint *buffer);
-	void execute();		//starting feeding thread
-	void threadAbort();	//stopping feeding thread
-	void wait();
+	bool filling;		//Are we already filling buffers?
 };
 
-bool checkALError();
+bool checkALError(std::string errorMessage);
 
 #endif
