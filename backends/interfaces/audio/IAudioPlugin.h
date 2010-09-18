@@ -33,15 +33,16 @@ class AudioStream
 {
   protected:
 	STREAM_STATUS status;	//Indicates the stream status
-	AudioStream(lightspark::AudioDecoder *dec = NULL, STREAM_STATUS initStatus = STARTING);
+	AudioStream( lightspark::AudioDecoder *dec = NULL );
 
   public:
 	lightspark::AudioDecoder *decoder;
 	virtual bool paused() = 0;	//Is the stream paused? (corked)
 	virtual bool isValid() = 0;	//Is the stream alive, fully working?
-	virtual void setStatus(STREAM_STATUS streamStatus);	//Set the stream status
+	virtual void setStatus( STREAM_STATUS streamStatus );	//Set the stream status
 	virtual STREAM_STATUS getStatus();	//Get the stream status
 	virtual uint32_t getPlayedTime() = 0;	//Get the time played in milliseconds
+	virtual void setPlayedTime( uint32_t basetime ) = 0;	//Set the basetime (in msec) of a stream (so appropriate time when seeking can be returned)
 	virtual void fill() = 0;	//Fill the stream without playing it
 	virtual void empty() = 0;	//Empty the stream
 	virtual ~AudioStream() {};

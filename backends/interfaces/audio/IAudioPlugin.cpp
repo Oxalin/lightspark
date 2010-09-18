@@ -68,8 +68,8 @@ IAudioPlugin::~IAudioPlugin()
 }
 
 
-AudioStream::AudioStream ( lightspark::AudioDecoder* dec, STREAM_STATUS initStatus ):
-	decoder(NULL), status(initStatus)
+AudioStream::AudioStream ( lightspark::AudioDecoder* dec ):
+	decoder(dec), status( STARTING )
 {
 
 }
