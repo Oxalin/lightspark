@@ -210,15 +210,14 @@ void PulsePlugin::freeStream ( AudioStream *audioStream )
 
 AudioStream *PulsePlugin::createStream ( AudioDecoder *decoder )
 {
-	PulseAudioStream *audioStream = new PulseAudioStream( this );
+	assert ( decoder->isValid() );
+	PulseAudioStream *audioStream = new PulseAudioStream( this, decoder );
 	streams.push_back( audioStream );	//Create new SoundStream
 	if ( serverAvailable() )
 	{
 		while ( !contextReady );
 		pulseLock();
-		assert ( decoder->isValid() );
 
-		audioStream->decoder = decoder;
 		pa_sample_spec ss;
 		ss.format = PA_SAMPLE_S16LE;
 		ss.rate = decoder->sampleRate;
@@ -343,8 +342,8 @@ void PulsePlugin::terminate()
 /****************************
 Stream's functions
 ****************************/
-PulseAudioStream::PulseAudioStream ( PulsePlugin* m )  : 
-	AudioStream(NULL, STARTING), stream ( NULL ), manager ( m )
+PulseAudioStream::PulseAudioStream ( PulsePlugin *m, AudioDecoder *dec )  : 
+	AudioStream( dec ), stream ( NULL ), manager ( m ), streamBaseOffset(0)
 {
 
 }
@@ -371,7 +370,12 @@ uint32_t PulseAudioStream::getPlayedTime ( )
 		}
 	}
 
-	return time / 1000;
+	return (streamBaseOffset + (time / 1000));
+}
+
+void PulseAudioStream::setPlayedTime( uint32_t basetime )
+{
+	streamBaseOffset = basetime;
 }
 
 void PulseAudioStream::fill ()

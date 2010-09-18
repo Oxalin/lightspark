@@ -64,8 +64,9 @@ public:
 class PulseAudioStream: public AudioStream
 {
 public:
-	PulseAudioStream( PulsePlugin *m );
+	PulseAudioStream( PulsePlugin *m, lightspark::AudioDecoder *dec );
 	uint32_t getPlayedTime();
+	void setPlayedTime(uint32_t basetime);
 	bool paused();
 	bool isValid();
 	void fill();
@@ -73,7 +74,8 @@ public:
 
 	pa_stream *stream;
 	PulsePlugin *manager;
-
+private:
+	uint32_t streamBaseOffset;	//Basetime when seeking in msec, so it can be added to the played time.
 };
 
 void overflow_notify();
