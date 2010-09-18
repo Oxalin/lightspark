@@ -589,7 +589,7 @@ void NetStream::tick()
 	if(paused)
 	{
 		//If sound is enabled, pause the sound stream too. This will stop all time from running.
-		if(audioStream && audioStream->isValid() && !audioStream->paused())
+		if( audioStream && audioStream->isValid() && !audioStream->paused())
 		{
 			sys->audioManager->pauseStreamPlugin(audioStream);
 		}
@@ -597,18 +597,24 @@ void NetStream::tick()
 	}
 
 	//If sound is enabled, and the stream is not paused anymore, resume the sound stream. This will restart time.
-	else if(audioStream && audioStream->isValid() && audioStream->paused())
+	else
 	{
-		sys->audioManager->playStreamPlugin(audioStream);
-	}
+		if( audioStream && audioStream->isValid() && audioStream->paused())
+		{
+			sys->audioManager->playStreamPlugin(audioStream);
+		}
+		
+		if( audioStream && audioStream->isValid() )
+		{
+			audioStream->fill();
+		}
+	}	
 
 	//Advance video and audio to current time, follow the audio stream time
 	//No mutex needed, ticking can happen only when stream is completely ready
-	if(audioStream && sys->audioManager->isTimingAvailablePlugin())
+	if( audioStream && sys->audioManager->isTimingAvailablePlugin())
 	{
-		assert(audioDecoder);
 		streamTime=audioStream->getPlayedTime();
-		audioStream->fill();
 	}
 	else
 	{
