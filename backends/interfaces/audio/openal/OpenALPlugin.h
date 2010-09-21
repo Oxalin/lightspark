@@ -36,6 +36,7 @@
 #define NUM_BUFFERS 3	//Default number of buffers created. The buffer manager will take care of adding some if needed
 #define BUFFER_SIZE 4096	//Keeping buffer size as low as possible for latency, but without static noise
 #define NUM_SOURCES 1
+#define MAX_BUFFER_TIME 250	//Maximum time to buffer in msec
 #define CAPTURE_FREQ 44100
 //#define DEBUG
 
@@ -72,26 +73,30 @@ public:
 	~OpenALAudioStream();
 	uint32_t getPlayedTime();
 	void setPlayedTime(uint32_t basetime);	//set basetime when seeking, basetime is in msec
+	void play();
+	void pause();
+	void stop();
+	STREAM_STATUS getStatus();
 	bool paused();
 	bool isValid();
 	void fill();
 	void empty();
 	OpenALPlugin *manager;
-	std::vector<ALuint> pbBuffers;
-	ALuint	pbSource;	//In flash, only one source per stream
 	ALenum	format;
 	ALuint	freq;
 
   private:
-//	typedef std::vector<ALuint>::iterator buffer_iterator;
-//	buffer_iterator unqueuedIterator;
 	uint64_t streamBaseOffset;	//Basetime when seeking (in BYTES), so it can be added to the played time (AL_BYTE_OFFSET).
+	std::vector<ALuint> pbBuffers;	//Vector of buffers
+	std::vector<uint32_t> pbBuffersDataSize;	//Vector of data size of vector
+	ALuint	pbSource;	//In flash, only one source per stream
+	bool filling;		//Are we already filling buffers?
 	uint32_t fillBuffer(ALuint *buffer, bool &err);
 	bool createBuffer(ALuint &buffer);	//Create a new buffer and add it at queue
 	bool deleteBuffer(ALuint &buffer);	//Delete last unqueued buffer
+	bool unqueueBuffer(ALuint &buffer);	//Pop the first buffer processed (free) from the source and increment played bytes
 	bool queueBuffer(ALuint &buffer);	//Queue the buffer
-	bool filling;		//Are we already filling buffers?
-	uint16_t numBuffers;
+	void getALState(ALint &state);	//Query the state of the source
 };
 
 bool checkALError(std::string errorMessage);
