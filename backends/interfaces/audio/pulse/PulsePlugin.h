@@ -20,6 +20,7 @@
 
 #ifndef PULSEPLUGIN_H
 #define PULSEPLUGIN_H
+//#define DEBUG
 
 #include <pulse/pulseaudio.h>
 #include "../IAudioPlugin.h"
@@ -65,6 +66,7 @@ class PulseAudioStream: public AudioStream
 {
 public:
 	PulseAudioStream( PulsePlugin *m, lightspark::AudioDecoder *dec );
+	~PulseAudioStream();
 	uint32_t getPlayedTime();
 	void setPlayedTime(uint32_t basetime);
 	bool paused();

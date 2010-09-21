@@ -348,6 +348,11 @@ PulseAudioStream::PulseAudioStream ( PulsePlugin *m, AudioDecoder *dec )  :
 
 }
 
+PulseAudioStream::~PulseAudioStream()
+{
+	empty();
+}
+
 uint32_t PulseAudioStream::getPlayedTime ( )
 {
 	pa_usec_t time = 0;
@@ -382,7 +387,7 @@ void PulseAudioStream::fill ()
 {
 	if ( isValid() )
 	{
-		if ( status != READY ) //The stream is not yet ready, delay upload
+		if ( status == STARTING ) //The stream is not yet ready, delay upload
 			return;
 		if ( !decoder->hasDecodedFrames() ) //No decoded data available yet, delay upload
 			return;
@@ -408,7 +413,9 @@ void PulseAudioStream::fill ()
 		}
 		while ( frameSize );
 
+		#ifdef DEBUG
 		cout << "Filled " << totalWritten << endl;
+		#endif
 		if ( totalWritten )
 		{
 			pa_stream_write ( stream, dest, totalWritten, NULL, 0, PA_SEEK_RELATIVE );
@@ -440,7 +447,12 @@ bool PulseAudioStream::paused()
 
 void PulseAudioStream::empty()
 {
-//To be completed
+	manager->pulseLock();
+	
+	pa_stream_cork(stream, 1, NULL, NULL);	//pause the stream first
+	pa_stream_drain(stream, NULL, NULL);	//drain the stream
+
+	manager->pulseUnlock();
 }
 
 //Always verify if a stream is dead before playing with it
