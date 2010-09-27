@@ -33,9 +33,11 @@
 #include "scripting/flashnet.h"
 #include "scripting/flashsystem.h"
 #include "timer.h"
-#include "backends/graphics.h"
 #include "backends/audio.h"
+#include "backends/config.h"
+#include "backends/graphics.h"
 #include "backends/pluginmanager.h"
+#include "backends/security.h"
 #include "backends/urlutils.h"
 
 #include "platforms/pluginutils.h"
@@ -130,8 +132,6 @@ public:
 	void setVariableByString(const std::string& s, ASObject* o);*/
 	void registerChildClip(MovieClip* clip);
 	void unregisterChildClip(MovieClip* clip);
-
-	Security::SANDBOXTYPE sandboxType;
 };
 
 class ThreadProfile
@@ -170,6 +170,7 @@ private:
 		}
 		void execute();
 		void threadAbort();
+		void jobFence(){}
 	};
 	friend class SystemState::EngineCreator;
 	ThreadPool* threadPool;
@@ -253,8 +254,9 @@ public:
 	Stage* stage;
 	ABCVm* currentVm;
 
-	PluginManager *pluginManager;
-	AudioManager *audioManager;
+	Config* config;
+	PluginManager* pluginManager;
+	AudioManager* audioManager;
 
 	//Application starting time in milliseconds
 	uint64_t startTime;
@@ -284,15 +286,13 @@ public:
 
 	DownloadManager* downloadManager;
 	IntervalManager* intervalManager;
+	SecurityManager* securityManager;
 
 	enum SCALE_MODE { EXACT_FIT=0, NO_BORDER=1, NO_SCALE=2, SHOW_ALL=3 };
 	SCALE_MODE scaleMode;
 	
 	//Static AS class properties
 	//NAMING: static$CLASSNAME$$PROPERTYNAME$
-	//	Security
-	bool staticSecurityExactSettings;
-	bool staticSecurityExactSettingsLocked;
 	//	NetConnection
 	ObjectEncoding::ENCODING staticNetConnectionDefaultObjectEncoding;
 };
@@ -305,6 +305,7 @@ private:
 	bool isEnded;
 	void execute();
 	void threadAbort();
+	void jobFence() {};
 public:
 	RootMovieClip* root;
 	int version;

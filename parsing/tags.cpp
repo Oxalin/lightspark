@@ -17,9 +17,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **************************************************************************/
 
+#include <libxml++/libxml++.h>
+#include <libxml++/parsers/textreader.h>
+
 #include <vector>
 #include <list>
 #include <algorithm>
+#include <sstream>
 #include "scripting/abc.h"
 #include "tags.h"
 #include "scripting/actions.h"
@@ -243,7 +247,7 @@ void RemoveObject2Tag::execute(MovieClip* parent, list <pair<PlaceInfo, DisplayO
 {
 	list <pair<PlaceInfo, DisplayObject*> >::iterator it=ls.begin();
 
-	for(;it!=ls.end();it++)
+	for(;it!=ls.end();++it)
 	{
 		if(it->second->Depth==Depth)
 		{
@@ -712,7 +716,7 @@ void DefineTextTag::inputRender()
 	int count=0;
 	unsigned int shapes_done=0;
 	it= TextRecords.begin();
-	for(;it!=TextRecords.end();it++)
+	for(;it!=TextRecords.end();++it)
 	{
 		if(it->StyleFlagsHasFont)
 		{
@@ -726,7 +730,7 @@ void DefineTextTag::inputRender()
 		x2+=(*it).XOffset;
 		y2+=(*it).YOffset;
 
-		for(;it2!=(it->GlyphEntries.end());it2++)
+		for(;it2!=(it->GlyphEntries.end());++it2)
 		{
 			while(shapes_done<cached.size() &&  cached[shapes_done].id==count)
 			{
@@ -758,7 +762,7 @@ void DefineTextTag::Render()
 		int count=0;
 		std::vector < TEXTRECORD >::iterator it= TextRecords.begin();
 		std::vector < GLYPHENTRY >::iterator it2;
-		for(;it!=TextRecords.end();it++)
+		for(;it!=TextRecords.end();++it)
 		{
 			if(it->StyleFlagsHasFont)
 			{
@@ -768,7 +772,7 @@ void DefineTextTag::Render()
 					LOG(LOG_ERROR,_("Should be a FontTag"));
 			}
 			it2 = it->GlyphEntries.begin();
-			for(;it2!=(it->GlyphEntries.end());it2++)
+			for(;it2!=(it->GlyphEntries.end());++it2)
 			{
 				//TODO: refactor to cache glyphs
 				vector<GeomShape> new_shapes;
@@ -803,7 +807,7 @@ void DefineTextTag::Render()
 	float scale_cur=1;
 	int count=0;
 	unsigned int shapes_done=0;
-	for(;it!=TextRecords.end();it++)
+	for(;it!=TextRecords.end();++it)
 	{
 		if(it->StyleFlagsHasFont)
 		{
@@ -817,7 +821,7 @@ void DefineTextTag::Render()
 		x2+=(*it).XOffset;
 		y2+=(*it).YOffset;
 
-		for(;it2!=(it->GlyphEntries.end());it2++)
+		for(;it2!=(it->GlyphEntries.end());++it2)
 		{
 			while(shapes_done<cached.size() && cached[shapes_done].id==count)
 			{
@@ -935,14 +939,14 @@ void DefineMorphShapeTag::Render()
 	rt->glAcquireFramebuffer();
 
 	std::vector < GeomShape >::iterator it=shapes.begin();
-	for(;it!=shapes.end();it++)
+	for(;it!=shapes.end();++it)
 		it->Render();
 
 	rt->glBlitFramebuffer();
 	if(rt->glAcquireIdBuffer())
 	{
 		std::vector < GeomShape >::iterator it=shapes.begin();
-		for(;it!=shapes.end();it++)
+		for(;it!=shapes.end();++it)
 			it->Render();
 		rt->glReleaseIdBuffer();
 	}
@@ -960,7 +964,7 @@ void DefineShapeTag::inputRender()
 	glScalef(0.05,0.05,1);
 
 	std::vector < GeomShape >::iterator it=cached.begin();
-	for(;it!=cached.end();it++)
+	for(;it!=cached.end();++it)
 	{
 		assert_and_throw(it->color <= Shapes.FillStyles.FillStyleCount);
 		it->Render();
@@ -990,7 +994,7 @@ void DefineShapeTag::Render()
 		rt->glAcquireTempBuffer(ShapeBounds.Xmin,ShapeBounds.Xmax,ShapeBounds.Ymin,ShapeBounds.Ymax);
 
 	std::vector < GeomShape >::iterator it=cached.begin();
-	for(;it!=cached.end();it++)
+	for(;it!=cached.end();++it)
 	{
 		assert_and_throw(it->color <= Shapes.FillStyles.FillStyleCount);
 		it->Render();
@@ -1248,7 +1252,7 @@ void PlaceObject2Tag::execute(MovieClip* parent, list < pair< PlaceInfo, Display
 	PlaceInfo infos;
 	//Find if this id is already on the list
 	list < pair<PlaceInfo, DisplayObject*> >::iterator it=ls.begin();
-	for(;it!=ls.end();it++)
+	for(;it!=ls.end();++it)
 	{
 		if(it->second->Depth==Depth)
 		{
@@ -1415,7 +1419,7 @@ void PlaceObject3Tag::execute(MovieClip* parent, list < pair< PlaceInfo, Display
 	PlaceInfo infos;
 	//Find if this id is already on the list
 	list < pair<PlaceInfo, DisplayObject*> >::iterator it=ls.begin();
-	for(;it!=ls.end();it++)
+	for(;it!=ls.end();++it)
 	{
 		if(it->second->Depth==Depth)
 		{
@@ -1812,7 +1816,7 @@ ScriptLimitsTag::ScriptLimitsTag(RECORDHEADER h, std::istream& in):Tag(h)
 {
 	LOG(LOG_TRACE,_("ScriptLimitsTag Tag"));
 	in >> MaxRecursionDepth >> ScriptTimeoutSeconds;
-	LOG(LOG_NO_INFO,_("MaxRecusionDepth: ") << MaxRecursionDepth << _(", ScriptTimeoutSeconds: ") << ScriptTimeoutSeconds);
+	LOG(LOG_NO_INFO,_("MaxRecursionDepth: ") << MaxRecursionDepth << _(", ScriptTimeoutSeconds: ") << ScriptTimeoutSeconds);
 }
 
 DebugIDTag::DebugIDTag(RECORDHEADER h, std::istream& in):Tag(h)
@@ -1855,5 +1859,15 @@ MetadataTag::MetadataTag(RECORDHEADER h, std::istream& in):Tag(h)
 {
 	LOG(LOG_TRACE,_("MetadataTag Tag"));
 	in >> XmlString;
-	LOG(LOG_NO_INFO,_("MetaData: ") << XmlString);
+
+	string XmlStringStd = XmlString;
+	xmlpp::TextReader xml((const unsigned char*)XmlStringStd.c_str(), XmlStringStd.length());
+
+	ostringstream output;
+	while(xml.read())
+	{
+		if(xml.get_depth() == 2 && xml.read_string() != "")
+			output << endl << "\t" << xml.get_local_name() << ":\t\t" << xml.read_string();
+	}
+	LOG(LOG_NO_INFO, "SWF Metadata:" << output.str());
 }

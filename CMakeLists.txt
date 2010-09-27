@@ -91,6 +91,7 @@ ENDIF(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^i[3-6]86$|^x86$")
 
 # Using relative folders, cmake happens by itself CMAKE_INSTALL_PREFIX
 IF(UNIX)
+	 SET(ETCDIR "/etc") #Using absolute folder
    SET(BINDIR "bin")
    SET(DATADIR "${CMAKE_INSTALL_PREFIX}/share")
    SET(LIBDIR "lib${LIB_SUFFIX}")
@@ -103,7 +104,6 @@ SET(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install prefix, default is /us
 SET(COMPILE_LIGHTSPARK TRUE CACHE BOOL "Compile Lightspark?")
 SET(COMPILE_TIGHTSPARK TRUE CACHE BOOL "Compile Tightspark?")
 SET(COMPILE_PLUGIN FALSE CACHE BOOL "Compile the browser plugin?")
-SET(AUDIO_BACKEND "pulse" CACHE STRING "Choose audio backend: none pulse alsa, default is pulse")
 SET(ENABLE_CURL TRUE CACHE BOOL "Enable CURL? (Required for Downloader functionality)")
 SET(ENABLE_LIBAVCODEC TRUE CACHE BOOL "Enable libavcodec and dependent functionality?")
 SET(PLUGIN_DIRECTORY "${LIBDIR}/mozilla/plugins" CACHE STRING "Directory to install Firefox plugin to")
@@ -127,6 +127,10 @@ INCLUDE(FindOpenGL REQUIRED)
 INCLUDE(FindPCRECPP REQUIRED)
 INCLUDE(FindFTGL REQUIRED)
 INCLUDE(FindGLEW REQUIRED)
+IF(UNIX)
+  INCLUDE(FindPkgConfig REQUIRED)
+	pkg_check_modules(XMLPP REQUIRED libxml++-2.6)
+ENDIF(UNIX)
 
 if(WIN32)
   INCLUDE(FindPThreads REQUIRED)
@@ -134,7 +138,7 @@ ELSE(WIN32)
   INCLUDE(FindThreads REQUIRED)
 ENDIF(WIN32)
 
-find_package(Boost COMPONENTS filesystem system regex REQUIRED)
+find_package(Boost COMPONENTS filesystem system REQUIRED)
 if(Boost_FOUND)
   INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 ENDIF(Boost_FOUND)
@@ -189,6 +193,7 @@ INCLUDE_DIRECTORIES(${OPENGL_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${PCRECPP_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${FTGL_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${GLEW_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${XMLPP_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${EXTRA_LIBS_INCLUDE_DIRS})
 
 IF(ENABLE_LIBAVCODEC)
@@ -254,14 +259,18 @@ SET(LIBSPARK_SOURCES
   threading.cpp
   timer.cpp
   backends/audio.cpp
+  backends/config.cpp
   backends/decoder.cpp
   backends/geometry.cpp
   backends/graphics.cpp
   backends/input.cpp
   backends/netutils.cpp
   backends/pluginmanager.cpp
-  backends/urlutils.cpp
   backends/rendering.cpp
+  backends/security.cpp
+  backends/urlutils.cpp
+  parsing/config.cpp
+  parsing/crossdomainpolicy.cpp
   parsing/flv.cpp
   parsing/streams.cpp
   parsing/tags.cpp
@@ -310,7 +319,11 @@ ELSE (CMAKE_COMPILER_IS_GNUCC)
   ADD_LIBRARY(spark STATIC ${LIBSPARK_SOURCES})
 ENDIF (CMAKE_COMPILER_IS_GNUCC)
 
-TARGET_LINK_LIBRARIES(spark ${EXTRA_LIBS_LIBRARIES} ${ZLIB_LIBRARIES} ${Boost_LIBRARIES} ${LLVM_LIBS_CORE} ${LLVM_LIBS_JIT} ${SDL_LIBRARY} ${OPTIONAL_LIBRARIES} ${GTK_LIBRARIES} ${FREETYPE_LIBRARIES} ${OPENGL_LIBRARIES} ${FTGL_LIBRARIES} ${GLEW_LIBRARIES} ${PCRECPP_LIBRARIES} ${Threads_LIBRARIES})
+TARGET_LINK_LIBRARIES(spark ${EXTRA_LIBS_LIBRARIES} ${ZLIB_LIBRARIES}
+	${Boost_LIBRARIES} ${LLVM_LIBS_CORE} ${LLVM_LIBS_JIT} ${SDL_LIBRARY}
+	${OPTIONAL_LIBRARIES} ${GTK_LIBRARIES} ${FREETYPE_LIBRARIES}
+	${OPENGL_LIBRARIES} ${FTGL_LIBRARIES} ${GLEW_LIBRARIES} ${PCRECPP_LIBRARIES}
+	${Threads_LIBRARIES} ${XMLPP_LIBRARIES})
 SET_TARGET_PROPERTIES(spark PROPERTIES VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
 SET_TARGET_PROPERTIES(spark PROPERTIES SOVERSION "${MAJOR_VERSION}.${MINOR_VERSION}")
 
@@ -352,16 +365,9 @@ ENDIF(COMPILE_PLUGIN)
 GETTEXT_CREATE_TRANSLATIONS(i18n/lightspark.pot ALL i18n/pl.po i18n/fr.po
         i18n/zh_CN.po)
 
-#Audio backend plugins
-IF(${AUDIO_BACKEND} MATCHES "pulse")
-  ADD_SUBDIRECTORY(backends/interfaces/audio/pulse)
-ENDIF(${AUDIO_BACKEND} MATCHES "pulse")
-IF(${AUDIO_BACKEND} MATCHES "alsa")
-  ADD_SUBDIRECTORY(backends/interfaces/audio/alsa)
-ENDIF(${AUDIO_BACKEND} MATCHES "alsa")
-IF(${AUDIO_BACKEND} MATCHES "openal")
-  ADD_SUBDIRECTORY(backends/interfaces/audio/openal)
-ENDIF(${AUDIO_BACKEND} MATCHES "openal")
+ADD_SUBDIRECTORY(backends/interfaces/audio/pulse)
+#ADD_SUBDIRECTORY(backends/interfaces/audio/alsa)
+#ADD_SUBDIRECTORY(backends/interfaces/audio/openal)
 
 #Install icons and desktop file
 if(UNIX)
@@ -376,4 +382,10 @@ if(UNIX)
           RENAME lightspark.svg
          )
   INSTALL(FILES media/lightspark.desktop DESTINATION ${DATADIR}/applications )
+endif(UNIX)
+
+if(UNIX)
+	INSTALL(FILES etc/xdg/lightspark.conf
+		      DESTINATION ${ETCDIR}/xdg/
+				 )
 endif(UNIX)
