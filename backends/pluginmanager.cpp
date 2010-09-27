@@ -35,7 +35,9 @@
 #endif
 
 using namespace lightspark;
+
 using namespace std;
+
 using namespace boost::filesystem;
 
 PluginManager::PluginManager()
@@ -51,93 +53,104 @@ void PluginManager::findPlugins()
 	//Search for all files under ${PRIVATELIBDIR}/plugins
 	//Verify if they are audio plugins
 	//If true, add to list of audio plugins
-	string froot ( PRIVATELIBDIR ), fplugins ( "/plugins/" ); //LS should always look in the plugins folder, nowhere else
-	const path plugins_folder = froot + fplugins;
-	const string pattern ( "liblightspark+[A-Za-z]+plugin.so" );
+	string froot( PRIVATELIBDIR ), fplugins( "/plugins/" );   //LS should always look in the plugins folder, nowhere else
+	const path pluginsFolder = froot + fplugins;
+	const string pattern( "liblightspark+[A-Za-z]+plugin.so" );
 
 	//Stuff used by/for pcre
 	const char* patternError;
 	int patternErrorOffset;
-	pcre* file_pattern = pcre_compile ( pattern.c_str(), 0, &patternError, &patternErrorOffset, NULL );
-	if(patternError)
-		throw RunTimeException("PluginManager::findPlugins(): can't compile file_pattern");
+	pcre* file_pattern = pcre_compile( pattern.c_str(), 0, &patternError, &patternErrorOffset, NULL );
+
+	if ( patternError )
+		throw RunTimeException( "PluginManager::findPlugins(): can't compile file_pattern" );
+
 	//We don't expect any captured substrings, so 3 ints should be enough
 	int patternOvector[3];
 
 #if defined DEBUG
-	cout << "Looking for plugins under " << plugins_folder << " for pattern " << pattern << endl;
+	cout << "Looking for plugins under " << pluginsFolder << " for pattern " << pattern << endl;
+
 #endif
 
-	if ( !is_directory ( plugins_folder ) )
+	if ( !is_directory( pluginsFolder ) )
 	{
-		LOG ( LOG_ERROR, _ ( ( ( string ) ( "The plugins folder doesn't exists under " + plugins_folder.string() ) ).c_str() ) );
+		LOG( LOG_ERROR, _((( string )( "The plugins folder doesn't exists under " + pluginsFolder.string() ) ).c_str() ) );
 	}
 	else
 	{
-		for ( recursive_directory_iterator itr ( plugins_folder ), end_itr; itr != end_itr; ++itr )
+		for ( recursive_directory_iterator itr( pluginsFolder ), end_itr; itr != end_itr; ++itr )
 		{
-			if ( is_regular_file ( itr.status() ) )   //Is it a real file? This will remove symlink
+			if ( is_regular_file( itr.status() ) )    //Is it a real file? This will remove symlink
 			{
 				string leaf_name = itr->path().filename();
-				int rc=pcre_exec(file_pattern, NULL, leaf_name.c_str(), leaf_name.length(), 0, 0, patternOvector, 3);
+				int rc = pcre_exec( file_pattern, NULL, leaf_name.c_str(), leaf_name.length(), 0, 0, patternOvector, 3 );
+
 				if ( rc > 0 )   // Does it answer to the desired pattern?
 				{
-					string fullpath = plugins_folder.directory_string() + leaf_name;
+					string fullpath = pluginsFolder.directory_string() + leaf_name;
 					//Try to load the file and see if it's an audio plugin
-					if ( HMODULE h_plugin = LoadLib ( fullpath ) )
+
+					if ( HMODULE h_plugin = LoadLib( fullpath ) )
 					{
-						PLUGIN_FACTORY p_factory_function = ( PLUGIN_FACTORY ) ExtractLibContent ( h_plugin, "create" );
-						PLUGIN_CLEANUP p_cleanup_function = ( PLUGIN_CLEANUP ) ExtractLibContent ( h_plugin, "release" );
+						PLUGIN_FACTORY p_factory_function = ( PLUGIN_FACTORY ) ExtractLibContent( h_plugin, "create" );
+						PLUGIN_CLEANUP p_cleanup_function = ( PLUGIN_CLEANUP ) ExtractLibContent( h_plugin, "release" );
 
 						if ( p_factory_function != NULL && p_cleanup_function != NULL )   //Does it contain the LS IPlugin?
 						{
-							IPlugin *p_plugin = ( *p_factory_function ) (); //Instanciate the plugin
-							LOG ( LOG_NO_INFO, _ ( "A plugin was found. Adding it to the list." ) );
-							addPluginToList ( p_plugin, fullpath ); //Add the plugin info to the audio plugins list
+							IPlugin *p_plugin = ( *p_factory_function )();  //Instanciate the plugin
+							LOG( LOG_NO_INFO, _( "A plugin was found. Adding it to the list." ) );
+							addPluginToList( p_plugin, fullpath );  //Add the plugin info to the audio plugins list
 
-							( *p_cleanup_function ) ( p_plugin );
-							CloseLib ( h_plugin );
+							( *p_cleanup_function )( p_plugin );
+							CloseLib( h_plugin );
 						}
 						else   //If doesn't implement our IPlugin interface entry points, close it
 						{
-							CloseLib ( h_plugin );
+							CloseLib( h_plugin );
 						}
 					}
 				}
 			}
 		}
 	}
-	pcre_free(file_pattern);
+
+	pcre_free( file_pattern );
 }
 
 //return a list of backends  of the appropriated PLUGIN_TYPES
-vector<string *> PluginManager::get_backendsList ( PLUGIN_TYPES typeSearched )
+vector<string *> PluginManager::getBackendsList( PLUGIN_TYPES typeSearched )
 {
 	vector<string *> retrievedList;
 	uint32_t count = 0;
+
 	for ( uint32_t index = 0; index < pluginsList.size(); index++ )
 	{
 		if ( pluginsList[index]->pluginType == typeSearched )
 		{
 			if ( count == retrievedList.size() )
 			{
-				retrievedList.push_back ( new string );
+				retrievedList.push_back( new string );
 			}
+
 			retrievedList[count] = &pluginsList[index]->backendName;
+
 			count++;
 		}
 	}
+
 	return retrievedList;
 }
 
 //get the desired plugin associated to the backend
-IPlugin *PluginManager::get_plugin ( string desiredBackend )
+IPlugin *PluginManager::getPlugin( string desiredBackend )
 {
-	LOG ( LOG_NO_INFO, _ ( ( ( string ) ( "get_plugin: " + desiredBackend ) ).c_str() ) );
-	int32_t index = findPluginInList ( "", desiredBackend, "", NULL, NULL );
+	LOG( LOG_NO_INFO, _((( string )( "getPlugin: " + desiredBackend ) ).c_str() ) );
+	int32_t index = findPluginInList( "", desiredBackend, "", NULL, NULL );
+
 	if ( index >= 0 )
 	{
-		loadPlugin ( index );
+		loadPlugin( index );
 		return pluginsList[index]->oLoadedPlugin;
 	}
 	else
@@ -150,13 +163,13 @@ IPlugin *PluginManager::get_plugin ( string desiredBackend )
 When a plugin is not needed anymore somewhere, the client that had asked it tells the manager it doesn't
 need it anymore. The PluginManager releases it (delete and unload).
 *******************/
-void PluginManager::release_plugin ( IPlugin* o_plugin )
+void PluginManager::releasePlugin( IPlugin* oPlugin )
 {
 	for ( uint32_t index = 0; index < pluginsList.size(); index++ )
 	{
-		if ( pluginsList[index]->oLoadedPlugin == o_plugin )
+		if ( pluginsList[index]->oLoadedPlugin == oPlugin )
 		{
-			unloadPlugin ( index );
+			unloadPlugin( index );
 		}
 	}
 }
@@ -164,26 +177,30 @@ void PluginManager::release_plugin ( IPlugin* o_plugin )
 /*********************
 Adds the information about a plugin in the plugins list
 *********************/
-void PluginManager::addPluginToList ( IPlugin *o_plugin, string pathToPlugin )
+void PluginManager::addPluginToList( IPlugin *oPlugin, string pathToPlugin )
 {
 	//Verify if the plugin is already in the list
-	int32_t index = findPluginInList ( "", "", pathToPlugin, NULL, NULL );
+	int32_t index = findPluginInList( "", "", pathToPlugin, NULL, NULL );
+
 	if ( index >= 0 )   //If true, plugin is already in the list, we have nothing to do
 	{
 		return;
 	}
 	else
 	{
-		index = ( int32_t ) ( pluginsList.size() ); //we want to add the plugin to the end of the list
-		if ( pluginsList.size() == ( uint32_t ) ( index ) )
+		index = ( int32_t )( pluginsList.size() );  //we want to add the plugin to the end of the list
+
+		if ( pluginsList.size() == ( uint32_t )( index ) )
 		{
-			pluginsList.push_back ( new PluginModule() );
+			pluginsList.push_back( new PluginModule() );
 		}
-		pluginsList[index]->pluginName = o_plugin->get_pluginName();
-		pluginsList[index]->backendName = o_plugin->get_backendName();
+
+		pluginsList[index]->pluginName = oPlugin->getPluginName();
+
+		pluginsList[index]->backendName = oPlugin->getBackendName();
 		pluginsList[index]->pluginPath = pathToPlugin;
 		pluginsList[index]->enabled = false;
-		LOG ( LOG_NO_INFO, _ ( ( ( string ) ( "The plugin " + pluginsList[index]->pluginName + " was added with backend: " + pluginsList[index]->backendName ) ).c_str() ) );
+		LOG( LOG_NO_INFO, _((( string )( "The plugin " + pluginsList[index]->pluginName + " was added with backend: " + pluginsList[index]->backendName ) ).c_str() ) );
 	}
 }
 
@@ -191,13 +208,14 @@ void PluginManager::addPluginToList ( IPlugin *o_plugin, string pathToPlugin )
 Removes the information about a plugin from the plugins list.
 It's used only by the manager when there are modifications in the plugins folder.
 **********************/
-void PluginManager::removePluginFromList ( string pluginPath )
+void PluginManager::removePluginFromList( string pluginPath )
 {
-	int32_t index = findPluginInList ( "", "", pluginPath, NULL, NULL );
+	int32_t index = findPluginInList( "", "", pluginPath, NULL, NULL );
+
 	if ( index >= 0 )
 	{
-		unloadPlugin ( index );
-		pluginsList.erase ( pluginsList.begin() + index );
+		unloadPlugin( index );
+		pluginsList.erase( pluginsList.begin() + index );
 	}
 }
 
@@ -205,65 +223,72 @@ void PluginManager::removePluginFromList ( string pluginPath )
 Looks in the plugins list for the desired entry.
 If found, returns the location in the list (index). Else, returns -1 (which can't be an entry in the list)
 **************************/
-int32_t PluginManager::findPluginInList ( string desiredname, string desiredbackend,
-        string desiredpath, void* hdesiredloadPlugin, IPlugin* o_desiredPlugin )
+int32_t PluginManager::findPluginInList( string desiredName, string desiredBackend,
+        string desiredPath, void* hDesiredloadPlugin, IPlugin* oDesiredPlugin )
 {
 	for ( uint32_t index = 0; index < pluginsList.size(); index++ )
 	{
-		if ( ( desiredname != "" ) && ( pluginsList[index]->pluginName == desiredname ) )
+		if (( desiredName != "" ) && ( pluginsList[index]->pluginName == desiredName ) )
 		{
 			return index;
 		}
-		if ( ( desiredbackend != "" ) && ( pluginsList[index]->backendName == desiredbackend ) )
+
+		if (( desiredBackend != "" ) && ( pluginsList[index]->backendName == desiredBackend ) )
 		{
 			return index;
 		}
-		if ( ( desiredpath != "" ) && ( pluginsList[index]->pluginPath == desiredpath ) )
+
+		if (( desiredPath != "" ) && ( pluginsList[index]->pluginPath == desiredPath ) )
 		{
 			return index;
 		}
-		if ( ( hdesiredloadPlugin != NULL ) && ( pluginsList[index]->hLoadedPlugin == hdesiredloadPlugin ) )
+
+		if (( hDesiredloadPlugin != NULL ) && ( pluginsList[index]->hLoadedPlugin == hDesiredloadPlugin ) )
 		{
 			return index;
 		}
-		if ( ( o_desiredPlugin != NULL ) && ( pluginsList[index]->oLoadedPlugin == o_desiredPlugin ) )
+
+		if (( oDesiredPlugin != NULL ) && ( pluginsList[index]->oLoadedPlugin == oDesiredPlugin ) )
 		{
 			return index;
 		}
 	}
-	#ifdef DEBUG
-	LOG ( LOG_NO_INFO, _ ( "findPluginInList: no plugin found in list with searched options." ) );
-	#endif
+
+#ifdef DEBUG
+	LOG( LOG_NO_INFO, _( "findPluginInList: no plugin found in list with searched options." ) );
+
+#endif
 	return -1;
 }
 
 
 //Takes care to load and instanciate anything related to the plugin
-void PluginManager::loadPlugin ( uint32_t desiredindex )
+void PluginManager::loadPlugin( uint32_t desiredIndex )
 {
-	if (( pluginsList[desiredindex]->hLoadedPlugin = LoadLib ( pluginsList[desiredindex]->pluginPath ) ))
+	if (( pluginsList[desiredIndex]->hLoadedPlugin = LoadLib( pluginsList[desiredIndex]->pluginPath ) ) )
 	{
-		PLUGIN_FACTORY p_factory_function = ( PLUGIN_FACTORY ) ExtractLibContent ( pluginsList[desiredindex]->hLoadedPlugin, "create" );
+		PLUGIN_FACTORY p_factory_function = ( PLUGIN_FACTORY ) ExtractLibContent( pluginsList[desiredIndex]->hLoadedPlugin, "create" );
+
 		if ( p_factory_function != NULL )   //Does it contain the LS IPlugin?
 		{
-			pluginsList[desiredindex]->oLoadedPlugin = ( *p_factory_function ) (); //Instanciate the plugin
-			pluginsList[desiredindex]->enabled = true;
+			pluginsList[desiredIndex]->oLoadedPlugin = ( *p_factory_function )();  //Instanciate the plugin
+			pluginsList[desiredIndex]->enabled = true;
 		}
 	}
 }
 
 //Takes care of unloading and releasing anything related to the plugin
-void PluginManager::unloadPlugin ( uint32_t desiredIndex )
+void PluginManager::unloadPlugin( uint32_t desiredIndex )
 {
 	if ( pluginsList[desiredIndex]->oLoadedPlugin || pluginsList[desiredIndex]->hLoadedPlugin )   //If there is already a backend loaded, unload it
 	{
 		if ( pluginsList[desiredIndex]->oLoadedPlugin != NULL )
 		{
-			PLUGIN_CLEANUP p_cleanup_function = ( PLUGIN_CLEANUP ) ExtractLibContent ( pluginsList[desiredIndex]->hLoadedPlugin, "release" );
+			PLUGIN_CLEANUP p_cleanup_function = ( PLUGIN_CLEANUP ) ExtractLibContent( pluginsList[desiredIndex]->hLoadedPlugin, "release" );
 
 			if ( p_cleanup_function != NULL )
 			{
-				p_cleanup_function ( pluginsList[desiredIndex]->oLoadedPlugin );
+				p_cleanup_function( pluginsList[desiredIndex]->oLoadedPlugin );
 			}
 			else
 			{
@@ -271,8 +296,10 @@ void PluginManager::unloadPlugin ( uint32_t desiredIndex )
 			}
 
 			pluginsList[desiredIndex]->oLoadedPlugin = NULL;
-			CloseLib ( pluginsList[desiredIndex]->hLoadedPlugin );
+
+			CloseLib( pluginsList[desiredIndex]->hLoadedPlugin );
 		}
+
 		pluginsList[desiredIndex]->enabled = false; //Unselecting any entry in the plugins list
 	}
 }
@@ -284,8 +311,8 @@ PluginManager::~PluginManager()
 
 
 PluginModule::PluginModule()
-		: pluginName ( "undefined" ), pluginType ( UNDEFINED ), backendName ( "undefined" ), pluginPath ( "" ),
-		enabled ( false ), hLoadedPlugin ( NULL ), oLoadedPlugin ( NULL )
+		: pluginName( "undefined" ), pluginType( UNDEFINED ), backendName( "undefined" ), pluginPath( "" ),
+		enabled( false ), hLoadedPlugin( NULL ), oLoadedPlugin( NULL )
 {
 
 }

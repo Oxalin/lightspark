@@ -30,15 +30,15 @@ enum PLUGIN_TYPES { UNDEFINED = 0, AUDIO, VIDEO, DECODER, ENCODER };
 class IPlugin
 {
 public:
-	virtual const std::string get_pluginName();
-	virtual const PLUGIN_TYPES get_pluginType();
-	virtual const std::string get_backendName();
+	virtual const std::string getPluginName();
+	virtual const PLUGIN_TYPES getPluginType();
+	virtual const std::string getBackendName();
 	virtual ~IPlugin();
 protected:
 	PLUGIN_TYPES pluginType;	//type of plugin of PLUGIN_TYPES
 	std::string pluginName;		//name of the plugin
-	std::string backendName;		//backend supported by the plugin
-	IPlugin ( PLUGIN_TYPES plugin_type, std::string plugin_name, std::string backend_name );
+	std::string backendName;	//backend supported by the plugin
+	IPlugin ( PLUGIN_TYPES type, std::string name, std::string backend );
 };
 
 /*************************

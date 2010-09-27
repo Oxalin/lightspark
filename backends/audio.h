@@ -39,11 +39,11 @@ namespace lightspark
 class AudioManager
 {
 private:
-	std::vector<std::string *>audioplugins_list;
+	std::vector<std::string *>audioPluginsList;
 	IAudioPlugin *oAudioPlugin;
 	std::string selectedAudioBackend;
-	void load_audioplugin ( std::string selected_backend );
-	void release_audioplugin();
+	void loadAudioPlugin ( std::string selected_backend );
+	void releaseAudioPlugin();
 	PluginManager *pluginManager;
 
 
@@ -56,9 +56,9 @@ public:
 	void pauseStreamPlugin( AudioStream *audioStream );	//Pause the stream (stops time from running, cork)
 	void playStreamPlugin( AudioStream *audioStream);	//Play the stream or resume it if it was paused (restart time, uncork)
 	void stopStreamPlugin( AudioStream *audioStream);	//Stop the stream and reinitialize it
-	void set_audiobackend ( std::string desired_backend );
-	void get_audioBackendsList();
-	void refresh_audioplugins_list();
+	void setAudioBackend ( std::string backend );
+	void getAudioBackendsList();
+	void refreshAudioPluginsList();
 	~AudioManager();
 };
 

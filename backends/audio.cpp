@@ -31,6 +31,7 @@
 #endif
 
 using namespace lightspark;
+
 using namespace std;
 
 extern TLSDATA SystemState* sys;
@@ -46,14 +47,14 @@ Else
   Select and load the good audio plugin lib files
 *****************/
 
-AudioManager::AudioManager ( PluginManager *sharedPluginManager )
+AudioManager::AudioManager( PluginManager *sharedPluginManager )
 {
 	pluginManager = sharedPluginManager;
 	selectedAudioBackend = "";
 	oAudioPlugin = NULL;
 //	  string DesiredAudio = get_audioConfig(); //Looks for the audio selected in the user's config
-	string DesiredAudio = sys->config->getAudioBackendName();
-	set_audiobackend ( DesiredAudio );
+	string desiredAudio = sys->config->getAudioBackendName();
+	setAudioBackend( desiredAudio );
 }
 
 bool AudioManager::pluginLoaded() const
@@ -61,27 +62,27 @@ bool AudioManager::pluginLoaded() const
 	return oAudioPlugin != NULL;
 }
 
-void AudioManager::freeStreamPlugin ( AudioStream *audioStream )
+void AudioManager::freeStreamPlugin( AudioStream *audioStream )
 {
 	if ( pluginLoaded() )
 	{
-		oAudioPlugin->freeStream ( audioStream );
+		oAudioPlugin->freeStream( audioStream );
 	}
 	else
 	{
-		LOG ( LOG_ERROR, _ ( "No audio plugin loaded, can't free stream" ) );
+		LOG( LOG_ERROR, _( "No audio plugin loaded, can't free stream" ) );
 	}
 }
 
-AudioStream *AudioManager::createStreamPlugin ( AudioDecoder *decoder )
+AudioStream *AudioManager::createStreamPlugin( AudioDecoder *decoder )
 {
 	if ( pluginLoaded() )
 	{
-		return oAudioPlugin->createStream ( decoder );
+		return oAudioPlugin->createStream( decoder );
 	}
 	else
 	{
-		LOG ( LOG_ERROR, _ ( "No audio plugin loaded, can't create stream" ) );
+		LOG( LOG_ERROR, _( "No audio plugin loaded, can't create stream" ) );
 		return NULL;
 	}
 }
@@ -90,11 +91,11 @@ void AudioManager::pauseStreamPlugin( AudioStream *audioStream )
 {
 	if ( pluginLoaded() )
 	{
-		oAudioPlugin->pauseStream ( audioStream );
+		oAudioPlugin->pauseStream( audioStream );
 	}
 	else
 	{
-		LOG ( LOG_ERROR, _ ( "No audio plugin loaded, can't pause stream" ) );
+		LOG( LOG_ERROR, _( "No audio plugin loaded, can't pause stream" ) );
 	}
 
 }
@@ -107,7 +108,7 @@ void AudioManager::playStreamPlugin( AudioStream *audioStream )
 	}
 	else
 	{
-		LOG ( LOG_ERROR, _ ( "No audio plugin loaded, can't play/resume stream" ) );
+		LOG( LOG_ERROR, _( "No audio plugin loaded, can't play/resume stream" ) );
 	}
 
 }
@@ -120,7 +121,7 @@ void AudioManager::stopStreamPlugin( AudioStream *audioStream )
 	}
 	else
 	{
-		LOG ( LOG_ERROR, _ ( "No audio plugin loaded, can't resume stream" ) );
+		LOG( LOG_ERROR, _( "No audio plugin loaded, can't resume stream" ) );
 	}
 
 }
@@ -133,48 +134,48 @@ bool AudioManager::isTimingAvailablePlugin() const
 	}
 	else
 	{
-		LOG ( LOG_ERROR, _ ( "isTimingAvailablePlugin: No audio plugin loaded" ) );
+		LOG( LOG_ERROR, _( "isTimingAvailablePlugin: No audio plugin loaded" ) );
 		return false;
 	}
 }
 
-void AudioManager::set_audiobackend ( string desired_backend )
+void AudioManager::setAudioBackend( string backend )
 {
-	if ( selectedAudioBackend != desired_backend )  	//Load the desired backend only if it's not already loaded
+	if ( selectedAudioBackend != backend )  	//Load the desired backend only if it's not already loaded
 	{
-		load_audioplugin ( desired_backend );
-		selectedAudioBackend = desired_backend;
+		loadAudioPlugin( backend );
+		selectedAudioBackend = backend;
 	}
 }
 
-void AudioManager::get_audioBackendsList()
+void AudioManager::getAudioBackendsList()
 {
-	audioplugins_list = pluginManager->get_backendsList ( AUDIO );
+	audioPluginsList = pluginManager->getBackendsList( AUDIO );
 }
 
-void AudioManager::refresh_audioplugins_list()
+void AudioManager::refreshAudioPluginsList()
 {
-	audioplugins_list.clear();
-	get_audioBackendsList();
+	audioPluginsList.clear();
+	getAudioBackendsList();
 }
 
-void AudioManager::release_audioplugin()
+void AudioManager::releaseAudioPlugin()
 {
 	if ( pluginLoaded() )
 	{
-		pluginManager->release_plugin ( oAudioPlugin );
+		pluginManager->releasePlugin( oAudioPlugin );
 	}
 }
 
-void AudioManager::load_audioplugin ( string selected_backend )
+void AudioManager::loadAudioPlugin( string backend )
 {
-	LOG ( LOG_NO_INFO, _ ( ( ( string ) ( "the selected backend is: " + selected_backend ) ).c_str() ) );
-	release_audioplugin();
-	oAudioPlugin = static_cast<IAudioPlugin *> ( pluginManager->get_plugin ( selected_backend ) );
+	LOG( LOG_NO_INFO, _((( string )( "the selected backend is: " + backend ) ).c_str() ) );
+	releaseAudioPlugin();
+	oAudioPlugin = static_cast<IAudioPlugin *>( pluginManager->getPlugin( backend ) );
 
 	if ( !pluginLoaded() )
 	{
-		LOG ( LOG_NO_INFO, _ ( "Could not load the audiobackend" ) );
+		LOG( LOG_NO_INFO, _( "Could not load the audiobackend" ) );
 	}
 }
 
@@ -183,6 +184,6 @@ stop AudioManager
 ***************************/
 AudioManager::~AudioManager()
 {
-	release_audioplugin();
+	releaseAudioPlugin();
 	pluginManager = NULL;	//The plugin manager is not deleted since it's been created outside of the audio manager
 }

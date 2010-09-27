@@ -40,18 +40,18 @@ class PluginManager
 private:
 	std::vector<PluginModule *> pluginsList;
 	void findPlugins();
-	void addPluginToList ( IPlugin *o_plugin, std::string pathToPlugin );
-	void removePluginFromList ( std::string plugin_path );
-	int32_t findPluginInList ( std::string desiredname = "", std::string desiredbackend = "", std::string desiredpath = "",
-	                           HMODULE hdesiredLoadPlugin = NULL, IPlugin *o_desiredPlugin = NULL );
-	void loadPlugin ( uint32_t desiredindex );
+	void addPluginToList ( IPlugin *oPlugin, std::string pathToPlugin );
+	void removePluginFromList ( std::string pluginPath );
+	int32_t findPluginInList ( std::string desiredName = "", std::string desiredBackend = "", std::string desiredPath = "",
+	                           HMODULE hdesiredLoadPlugin = NULL, IPlugin *oDesiredPlugin = NULL );
+	void loadPlugin ( uint32_t desiredIndex );
 	void unloadPlugin ( uint32_t desiredIndex );
 
 public:
 	PluginManager();
-	std::vector<std::string *> get_backendsList ( PLUGIN_TYPES typeSearched );
-	IPlugin *get_plugin ( std::string desiredBackend );
-	void release_plugin ( IPlugin *o_plugin );
+	std::vector<std::string *> getBackendsList ( PLUGIN_TYPES typeSearched );
+	IPlugin *getPlugin ( std::string desiredBackend );
+	void releasePlugin ( IPlugin *oPlugin );
 	~PluginManager();
 };
 
