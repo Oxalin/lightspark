@@ -120,6 +120,9 @@ Tag* TagFactory::readTag()
 		case 34:
 			ret=new DefineButton2Tag(h,f);
 			break;
+		case 35:
+			ret=new DefineBitsJPEG3Tag(h,f);
+			break;
 		case 36:
 			ret=new DefineBitsLossless2Tag(h,f);
 			break;
@@ -811,31 +814,27 @@ Vector2 DefineTextTag::debugRender(FTFont* font, bool deep)
 	return Vector2(100,100);
 }
 
-DefineShapeTag::DefineShapeTag(RECORDHEADER h, std::istream& in):DictionaryTag(h)
+DefineShapeTag::DefineShapeTag(RECORDHEADER h, std::istream& in):DictionaryTag(h),Shapes(1)
 {
 	LOG(LOG_TRACE,_("DefineShapeTag"));
-	Shapes.version=1;
 	in >> ShapeId >> ShapeBounds >> Shapes;
 }
 
-DefineShape2Tag::DefineShape2Tag(RECORDHEADER h, std::istream& in):DefineShapeTag(h)
+DefineShape2Tag::DefineShape2Tag(RECORDHEADER h, std::istream& in):DefineShapeTag(h,2)
 {
 	LOG(LOG_TRACE,_("DefineShape2Tag"));
-	Shapes.version=2;
 	in >> ShapeId >> ShapeBounds >> Shapes;
 }
 
-DefineShape3Tag::DefineShape3Tag(RECORDHEADER h, std::istream& in):DefineShape2Tag(h)
+DefineShape3Tag::DefineShape3Tag(RECORDHEADER h, std::istream& in):DefineShape2Tag(h,3)
 {
 	LOG(LOG_TRACE,_("DefineShape3Tag"));
-	Shapes.version=3;
 	in >> ShapeId >> ShapeBounds >> Shapes;
 }
 
-DefineShape4Tag::DefineShape4Tag(RECORDHEADER h, std::istream& in):DefineShape3Tag(h)
+DefineShape4Tag::DefineShape4Tag(RECORDHEADER h, std::istream& in):DefineShape3Tag(h,4)
 {
 	LOG(LOG_TRACE,_("DefineShape4Tag"));
-	Shapes.version=4;
 	in >> ShapeId >> ShapeBounds >> EdgeBounds;
 	BitStream bs(in);
 	UB(5,bs);
@@ -1888,4 +1887,42 @@ MetadataTag::MetadataTag(RECORDHEADER h, std::istream& in):Tag(h)
 			output << endl << "\t" << xml.get_local_name() << ":\t\t" << xml.read_string();
 	}
 	LOG(LOG_NO_INFO, "SWF Metadata:" << output.str());
+}
+
+DefineBitsJPEG2Tag::DefineBitsJPEG2Tag(RECORDHEADER h, std::istream& in):DictionaryTag(h)
+{
+	LOG(LOG_TRACE,_("DefineBitsJPEG2Tag Tag"));
+	in >> CharacterId;
+	//Read image data
+	int dataSize=Header.getLength()-2;
+	data=new(nothrow) uint8_t[dataSize];
+	in.read((char*)data,dataSize);
+}
+
+DefineBitsJPEG2Tag::~DefineBitsJPEG2Tag()
+{
+	delete[] data;
+}
+
+DefineBitsJPEG3Tag::DefineBitsJPEG3Tag(RECORDHEADER h, std::istream& in):DictionaryTag(h),alphaData(NULL)
+{
+	LOG(LOG_TRACE,_("DefineBitsJPEG3Tag Tag"));
+	UI32 dataSize;
+	in >> CharacterId >> dataSize;
+	//Read image data
+	data=new(nothrow) uint8_t[dataSize];
+	in.read((char*)data,dataSize);
+	//Read alpha data (if any)
+	int alphaSize=Header.getLength()-dataSize-6;
+	if(alphaSize>0) //If less that 0 the consistency check on tag size will stop later
+	{
+		alphaData=new(nothrow) uint8_t[alphaSize];
+		in.read((char*)alphaData,alphaSize);
+	}
+}
+
+DefineBitsJPEG3Tag::~DefineBitsJPEG3Tag()
+{
+	delete[] data;
+	delete[] alphaData;
 }

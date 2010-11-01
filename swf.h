@@ -81,7 +81,7 @@ class RootMovieClip: public MovieClip, public ITickJob
 {
 friend class ParseThread;
 protected:
-	sem_t mutex;
+	Mutex mutex;
 	bool initialized;
 	URLInfo origin;
 	void tick();
@@ -112,6 +112,7 @@ public:
 	float getFrameRate() const;
 	void setFrameRate(float f);
 	void setFrameCount(int f);
+	void setOnStage(bool staged);
 	void addToDictionary(DictionaryTag* r);
 	DictionaryTag* dictionaryLookup(int id);
 	void addToFrame(DisplayListTag* t);

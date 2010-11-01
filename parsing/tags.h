@@ -106,7 +106,7 @@ protected:
 	UI16 ShapeId;
 	RECT ShapeBounds;
 	SHAPEWITHSTYLE Shapes;
-	DefineShapeTag(RECORDHEADER h):DictionaryTag(h){};
+	DefineShapeTag(RECORDHEADER h,int v):DictionaryTag(h),Shapes(v){};
 public:
 	DefineShapeTag(RECORDHEADER h, std::istream& in);
 	virtual int getId(){ return ShapeId; }
@@ -125,7 +125,7 @@ public:
 class DefineShape2Tag: public DefineShapeTag
 {
 protected:
-	DefineShape2Tag(RECORDHEADER h):DefineShapeTag(h){};
+	DefineShape2Tag(RECORDHEADER h, int v):DefineShapeTag(h,v){};
 public:
 	DefineShape2Tag(RECORDHEADER h, std::istream& in);
 	virtual Vector2 debugRender(FTFont* font, bool deep);
@@ -140,7 +140,7 @@ public:
 class DefineShape3Tag: public DefineShape2Tag
 {
 protected:
-	DefineShape3Tag(RECORDHEADER h):DefineShape2Tag(h){};
+	DefineShape3Tag(RECORDHEADER h,int v):DefineShape2Tag(h,v){};
 public:
 	DefineShape3Tag(RECORDHEADER h, std::istream& in);
 	virtual int getId(){ return ShapeId; }
@@ -566,7 +566,7 @@ public:
 	void execute(RootMovieClip* root){};
 };
 
-class DefineBitsLosslessTag: public DictionaryTag
+class DefineBitsLosslessTag: public DictionaryTag, public Bitmap
 {
 private:
 	UI16 CharacterId;
@@ -577,13 +577,30 @@ private:
 	//ZlibBitmapData;
 public:
 	DefineBitsLosslessTag(RECORDHEADER h, std::istream& in);
-	virtual int getId(){ return CharacterId; }
+	int getId(){ return CharacterId; }
 };
 
-class DefineBitsJPEG2Tag: public Tag
+class DefineBitsJPEG2Tag: public DictionaryTag, public Bitmap
 {
+private:
+	UI16 CharacterId;
+	uint8_t* data;
 public:
 	DefineBitsJPEG2Tag(RECORDHEADER h, std::istream& in);
+	~DefineBitsJPEG2Tag();
+	int getId(){ return CharacterId; }
+};
+
+class DefineBitsJPEG3Tag: public DictionaryTag, public Bitmap
+{
+private:
+	UI16 CharacterId;
+	uint8_t* data;
+	uint8_t* alphaData;
+public:
+	DefineBitsJPEG3Tag(RECORDHEADER h, std::istream& in);
+	~DefineBitsJPEG3Tag();
+	int getId(){ return CharacterId; }
 };
 
 class DefineBitsLossless2Tag: public DictionaryTag, public Bitmap
@@ -597,8 +614,8 @@ private:
 	//ZlibBitmapData;
 public:
 	DefineBitsLossless2Tag(RECORDHEADER h, std::istream& in);
-	virtual int getId(){ return CharacterId; }
-	virtual ASObject* instance() const;
+	int getId(){ return CharacterId; }
+	ASObject* instance() const;
 	bool getBounds(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const
 	{
 		return false;
