@@ -167,6 +167,7 @@ ASFUNCTIONBODY(Loader,loadBytes)
 	th->bytes=static_cast<ByteArray*>(args[0]);
 	if(th->bytes->bytes)
 	{
+		th->bytes->incRef();
 		th->loading=true;
 		th->source=BYTES;
 		//To be decreffed in jobFence
@@ -211,21 +212,21 @@ void Loader::execute()
 	}
 	else if(source==BYTES)
 	{
-		//Implement loadBytes, now just dump
 		assert_and_throw(bytes->bytes);
 
 		//We only support swf files now
 		assert_and_throw(memcmp(bytes->bytes,"CWS",3)==0);
 
-		//The loaderInfo of the content is out contentLoaderInfo
+		//The loaderInfo of the content is our contentLoaderInfo
 		contentLoaderInfo->incRef();
 		local_root=new RootMovieClip(contentLoaderInfo);
-		zlib_bytes_filter zf(bytes->bytes,bytes->len);
-		istream s(&zf);
+		bytes_buf bb(bytes->bytes,bytes->len);
+		istream s(&bb);
 
 		ParseThread* local_pt = new ParseThread(local_root,s);
 		local_pt->run();
 		content=local_root;
+		bytes->decRef();
 	}
 	loaded=true;
 	//Add a complete event for this object
@@ -695,12 +696,13 @@ void MovieClip::advanceFrame()
 		//Should initialize all the frames from the current to the next
 		for(uint32_t i=(state.FP+1);i<=state.next_FP;i++)
 			frames[i].init(this,displayList);
+		bool frameChanging=(state.FP!=state.next_FP);
 		state.FP=state.next_FP;
 		if(!state.stop_FP && framesLoaded>0)
 			state.next_FP=imin(state.FP+1,framesLoaded-1);
 		state.explicit_FP=false;
 		assert(state.FP<frameScripts.size());
-		if(frameScripts[state.FP])
+		if(frameChanging && frameScripts[state.FP])
 			getVm()->addEvent(NULL,new FunctionEvent(frameScripts[state.FP]));
 	}
 
@@ -1717,6 +1719,7 @@ void DisplayObjectContainer::setOnStage(bool staged)
 	{
 		DisplayObject::setOnStage(staged);
 		//Notify childern
+		Locker l(mutexDisplayList);
 		list<DisplayObject*>::const_iterator it=dynamicDisplayList.begin();
 		for(;it!=dynamicDisplayList.end();++it)
 			(*it)->setOnStage(staged);
@@ -1787,8 +1790,8 @@ void DisplayObjectContainer::_removeChild(DisplayObject* child)
 	assert_and_throw(child->parent==this);
 	assert_and_throw(child->getRoot()==root);
 
-	Locker l(mutexDisplayList);
 	{
+		Locker l(mutexDisplayList);
 		list<DisplayObject*>::iterator it=find(dynamicDisplayList.begin(),dynamicDisplayList.end(),child);
 		assert_and_throw(it!=dynamicDisplayList.end());
 		dynamicDisplayList.erase(it);

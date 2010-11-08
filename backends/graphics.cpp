@@ -197,7 +197,7 @@ void TextureBuffer::resize(uint32_t w, uint32_t h)
 			if(err==GL_INVALID_VALUE)
 			{
 				LOG(LOG_ERROR,_("GL_INVALID_VALUE after glTexImage2D, width=") << allocWidth << _(" height=") << allocHeight);
-				throw RunTimeException("GL_INVALID_VALUE in TextureBuffer::setBGRAData");
+				throw RunTimeException("GL_INVALID_VALUE in TextureBuffer::resize");
 			}
 		}
 		width=w;
@@ -488,6 +488,23 @@ bool CairoRenderer::cairoPathFromTokens(cairo_t* cr, const std::vector<GeomToken
 					case LINEAR_GRADIENT:
 					{
 						cairo_pattern_t* pattern=cairo_pattern_create_linear(-16384,0,16384,0);
+						const cairo_matrix_t& pattern_mat=MATRIXToCairo(style.Matrix);
+						cairo_pattern_set_matrix(pattern, &pattern_mat);
+						
+						for(uint32_t i=0;i<style.Gradient.GradientRecords.size();i++)
+						{
+							double ratio=style.Gradient.GradientRecords[i].Ratio;
+							ratio/=255.0f;
+							const RGBA& color=style.Gradient.GradientRecords[i].Color;
+							cairo_pattern_add_color_stop_rgba(pattern, ratio, 
+									color.rf(), color.gf(), color.bf(), color.af());
+						} 
+						cairo_set_source(cr, pattern);
+						break;
+					}
+					case RADIAL_GRADIENT:
+					{
+						cairo_pattern_t* pattern=cairo_pattern_create_radial(0,0,0,0,0,16384);
 						const cairo_matrix_t& pattern_mat=MATRIXToCairo(style.Matrix);
 						cairo_pattern_set_matrix(pattern, &pattern_mat);
 						

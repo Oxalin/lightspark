@@ -229,7 +229,6 @@ nsPluginInstance::~nsPluginInstance()
 {
 	//Shutdown the system
 	sys=m_sys;
-	//cerr << "instance dying" << endl;
 	swf_buf.destroy();
 	m_pt->stop();
 	m_sys->setShutdownFlag();
@@ -471,7 +470,10 @@ NPError nsPluginInstance::DestroyStream(NPStream *stream, NPError reason)
 	if(stream->pdata)
 		cerr << "Destroy " << stream->pdata << endl;
 	else
+	{
+		swf_buf.destroy();
 		LOG(LOG_NO_INFO, _("DestroyStream on main stream"));
+	}
 	return NPERR_NO_ERROR;
 }
 

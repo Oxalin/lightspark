@@ -54,28 +54,6 @@ using namespace lightspark;
 
 extern TLSDATA ParseThread* pt;
 
-SWF_HEADER::SWF_HEADER(istream& in):valid(false)
-{
-	in >> Signature[0] >> Signature[1] >> Signature[2];
-
-	in >> Version >> FileLength;
-	if(Signature[0]=='F' && Signature[1]=='W' && Signature[2]=='S')
-	{
-		LOG(LOG_NO_INFO, _("Uncompressed SWF file: Version ") << (int)Version << _(" Length ") << FileLength);
-	}
-	else if(Signature[0]=='C' && Signature[1]=='W' && Signature[2]=='S')
-	{
-		LOG(LOG_NO_INFO, _("Compressed SWF file: Version ") << (int)Version << _(" Length ") << FileLength);
-	}
-	else
-	{
-		LOG(LOG_NO_INFO,_("No SWF file signature found"));
-		return;
-	}
-	in >> FrameSize >> FrameRate >> FrameCount;
-	valid=true;
-}
-
 RootMovieClip::RootMovieClip(LoaderInfo* li, bool isSys):mutex("mutexRoot"),initialized(false),parsingIsFailed(false),frameRate(0),
 	mutexFrames("mutexFrame"),toBind(false),mutexChildrenClips("mutexChildrenClips")
 {
@@ -428,7 +406,6 @@ void SystemState::setShutdownFlag()
 		currentVm->addEvent(NULL,e);
 		e->decRef();
 	}
-	//Set the flag after sending the event, otherwise it's ignored by the VM
 	shutdown=true;
 
 	sem_post(&terminated);
@@ -437,12 +414,17 @@ void SystemState::setShutdownFlag()
 void SystemState::wait()
 {
 	sem_wait(&terminated);
-	SDL_Event event;
-	event.type = SDL_USEREVENT;
-	event.user.code = SHUTDOWN;
-	event.user.data1 = 0;
-	event.user.data1 = 0;
-	SDL_PushEvent(&event);
+	if(engine==SDL)
+	{
+		SDL_Event event;
+		event.type = SDL_USEREVENT;
+		event.user.code = SHUTDOWN;
+		event.user.data1 = 0;
+		event.user.data1 = 0;
+		SDL_PushEvent(&event);
+	}
+	//Acquire the mutex to sure that the engines are not being started right now
+	Locker l(mutex);
 	renderThread->wait();
 	inputThread->wait();
 	if(currentVm)
@@ -499,7 +481,10 @@ void SystemState::delayedCreation(SystemState* th)
 	gtk_widget_map(p.container);
 	p.window=GDK_WINDOW_XWINDOW(p.container->window);
 	XSync(p.display, False);
+	//The lock is needed to avoid thread creation/destruction races
 	Locker l(th->mutex);
+	if(th->shutdown)
+		return;
 	th->renderThread->start(th->engine, &th->npapiParams);
 	th->inputThread->start(th->engine, &th->npapiParams);
 	//If the render rate is known start the render ticks
@@ -507,11 +492,23 @@ void SystemState::delayedCreation(SystemState* th)
 		th->startRenderTicks();
 }
 
+void SystemState::delayedStopping(SystemState* th)
+{
+	sys=th;
+	th->stopEngines();
+	sys=NULL;
+}
+
 #endif
 
 void SystemState::createEngines()
 {
 	Locker l(mutex);
+	if(shutdown)
+	{
+		//A shutdown request has arrived before the creation of engines
+		return;
+	}
 #ifdef COMPILE_PLUGIN
 	//Check if we should fall back on gnash
 	if(useGnashFallback && engine==GTKPLUG && vmVersion!=AVM2)
@@ -595,7 +592,8 @@ void SystemState::createEngines()
 			pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 			//Engines should not be started, stop everything
 			l.unlock();
-			stopEngines();
+			//We cannot stop the engines now, as this is inside a ThreadPool job
+			npapiParams.helper(npapiParams.helperArg, (helper_t)delayedStopping, this);
 			return;
 		}
 	}
@@ -607,7 +605,7 @@ void SystemState::createEngines()
 	}
 #endif
 
-	if(engine==GTKPLUG) //The engines must be created int the context of the main thread
+	if(engine==GTKPLUG) //The engines must be created in the context of the main thread
 	{
 #ifdef COMPILE_PLUGIN
 		npapiParams.helper(npapiParams.helperArg, (helper_t)delayedCreation, this);
@@ -625,6 +623,11 @@ void SystemState::createEngines()
 	}
 	l.unlock();
 	renderThread->waitForInitialization();
+	l.lock();
+	//As we lost the lock the shutdown procesure might have started
+	if(currentVm && !shutdown)
+		currentVm->start();
+	l.unlock();
 	//Now that there is something to actually render the contents add the SystemState to the stage
 	setOnStage(true);
 }
@@ -671,7 +674,7 @@ void SystemState::tick()
 {
 	RootMovieClip::tick();
 	{
-		Locker l(mutex);
+		SpinlockLocker l(profileDataSpinlock);
 		list<ThreadProfile>::iterator it=profilingData.begin();
 		for(;it!=profilingData.end();++it)
 			it->tick();
@@ -707,7 +710,7 @@ bool SystemState::removeJob(ITickJob* job)
 
 ThreadProfile* SystemState::allocateProfiler(const lightspark::RGB& color)
 {
-	Locker l(mutex);
+	SpinlockLocker l(profileDataSpinlock);
 	profilingData.push_back(ThreadProfile(color,100));
 	ThreadProfile* ret=&profilingData.back();
 	return ret;
@@ -808,7 +811,7 @@ void ThreadProfile::plot(uint32_t maxTime, FTFont* font)
 	}
 }
 
-ParseThread::ParseThread(RootMovieClip* r,istream& in):f(in),isEnded(false),root(NULL),version(0),useAVM2(false)
+ParseThread::ParseThread(RootMovieClip* r,istream& in):f(in),zlibFilter(NULL),backend(NULL),isEnded(false),root(NULL),version(0),useAVM2(false)
 {
 	root=r;
 	sem_init(&ended,0,0);
@@ -816,7 +819,57 @@ ParseThread::ParseThread(RootMovieClip* r,istream& in):f(in),isEnded(false),root
 
 ParseThread::~ParseThread()
 {
+	if(zlibFilter)
+	{
+		//Restore the istream
+		f.rdbuf(backend);
+		delete zlibFilter;
+	}
 	sem_destroy(&ended);
+}
+
+bool ParseThread::parseHeader()
+{
+	UI8 Signature[3];
+	UI8 Version;
+	UI32 FileLength;
+	RECT FrameSize;
+	UI16 FrameRate;
+	UI16 FrameCount;
+
+	f >> Signature[0] >> Signature[1] >> Signature[2];
+
+	f >> Version >> FileLength;
+	if(Signature[0]=='F' && Signature[1]=='W' && Signature[2]=='S')
+	{
+		LOG(LOG_NO_INFO, _("Uncompressed SWF file: Version ") << (int)Version << _(" Length ") << FileLength);
+	}
+	else if(Signature[0]=='C' && Signature[1]=='W' && Signature[2]=='S')
+	{
+		LOG(LOG_NO_INFO, _("Compressed SWF file: Version ") << (int)Version << _(" Length ") << FileLength);
+		//The file is compressed, create a filtering streambuf
+		backend=f.rdbuf();
+		f.rdbuf(new zlib_filter(backend));
+	}
+	else
+	{
+		LOG(LOG_NO_INFO,_("No SWF file signature found"));
+		return false;
+	}
+	f >> FrameSize >> FrameRate >> FrameCount;
+
+	version=Version;
+	root->version=Version;
+	root->fileLength=FileLength;
+	float frameRate=FrameRate;
+	frameRate/=256;
+	LOG(LOG_NO_INFO,_("FrameRate ") << frameRate);
+	root->setFrameRate(frameRate);
+	//TODO: setting render rate should be done when the clip is added to the displaylist
+	sys->setRenderRate(frameRate);
+	root->setFrameSize(FrameSize);
+	root->setFrameCount(FrameCount);
+	return true;
 }
 
 void ParseThread::execute()
@@ -824,20 +877,8 @@ void ParseThread::execute()
 	pt=this;
 	try
 	{
-		SWF_HEADER h(f);
-		if(!h.valid)
+		if(!parseHeader())
 			throw ParseException("Not an SWF file");
-		version=h.Version;
-		root->version=h.Version;
-		root->fileLenght=h.FileLength;
-		float frameRate=h.FrameRate;
-		frameRate/=256;
-		LOG(LOG_NO_INFO,_("FrameRate ") << frameRate);
-		root->setFrameRate(frameRate);
-		//TODO: setting render rate should be done when the clip is added to the displaylist
-		sys->setRenderRate(frameRate);
-		root->setFrameSize(h.getFrameSize());
-		root->setFrameCount(h.FrameCount);
 
 		//Create a top level TagFactory
 		TagFactory factory(f, true);
@@ -1004,7 +1045,7 @@ float RootMovieClip::getFrameRate() const
 
 void RootMovieClip::addToDictionary(DictionaryTag* r)
 {
-	Locker l(mutex);
+	SpinlockLocker l(dictSpinlock);
 	dictionary.push_back(r);
 }
 
@@ -1043,10 +1084,12 @@ void RootMovieClip::commitFrame(bool another)
 	{
 		//Let's initialize the first frame of this movieclip
 		bootstrap();
-		//TODO Should dispatch INIT here
 		//Root movie clips are initialized now, after the first frame is really ready 
 		initialize();
 		//Now the bindings are effective
+		//Execute the event registered for the first frame, if any
+		if(frameScripts[0])
+			getVm()->addEvent(NULL,new FunctionEvent(frameScripts[0]));
 
 		//When the first frame is committed the frame rate is known
 		sys->addTick(1000/frameRate,this);
@@ -1075,7 +1118,7 @@ void RootMovieClip::setBackground(const RGB& bg)
 
 DictionaryTag* RootMovieClip::dictionaryLookup(int id)
 {
-	Locker l(mutex);
+	SpinlockLocker l(dictSpinlock);
 	list< DictionaryTag*>::iterator it = dictionary.begin();
 	for(;it!=dictionary.end();++it)
 	{

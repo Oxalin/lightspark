@@ -61,21 +61,6 @@ class RenderThread;
 class ParseThread;
 class Tag;
 
-class SWF_HEADER
-{
-public:
-	UI8 Signature[3];
-	UI8 Version;
-	UI32 FileLength;
-	RECT FrameSize;
-	UI16 FrameRate;
-	UI16 FrameCount;
-	bool valid;
-	SWF_HEADER(std::istream& in);
-	const RECT& getFrameSize(){ return FrameSize; }
-};
-
-
 //RootMovieClip is used as a ThreadJob for timed rendering purpose
 class RootMovieClip: public MovieClip, public ITickJob
 {
@@ -90,6 +75,7 @@ private:
 	sem_t new_frame;
 	bool parsingIsFailed;
 	RGB Background;
+	Spinlock dictSpinlock;
 	std::list < DictionaryTag* > dictionary;
 	//frameSize and frameRate are valid only after the header has been parsed
 	RECT frameSize;
@@ -103,8 +89,8 @@ private:
 public:
 	RootMovieClip(LoaderInfo* li, bool isSys=false);
 	~RootMovieClip();
-	unsigned int version;
-	unsigned int fileLenght;
+	uint32_t version;
+	uint32_t fileLength;
 	RGB getBackground();
 	void setBackground(const RGB& bg);
 	void setFrameSize(const RECT& f);
@@ -194,6 +180,7 @@ private:
 	void createEngines();
 #ifdef COMPILE_PLUGIN
 	static void delayedCreation(SystemState* th);
+	static void delayedStopping(SystemState* th);
 #endif
 	/**
 	  	Destroys all the engines used in lightspark: timer, thread pool, vm...
@@ -217,6 +204,7 @@ private:
 	char cookiesFileName[32]; // "/tmp/lightsparkcookiesXXXXXX"
 
 	URLInfo url;
+	Spinlock profileDataSpinlock;
 public:
 	void setURL(const tiny_string& url) DLL_PUBLIC;
 	ENGINE getEngine() DLL_PUBLIC { return engine; };
@@ -299,11 +287,14 @@ class ParseThread: public IThreadJob
 {
 private:
 	std::istream& f;
+	std::streambuf* zlibFilter;
+	std::streambuf* backend;
 	sem_t ended;
 	bool isEnded;
 	void execute();
 	void threadAbort();
 	void jobFence() {};
+	bool parseHeader();
 public:
 	RootMovieClip* root;
 	int version;
