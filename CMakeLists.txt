@@ -369,7 +369,7 @@ GETTEXT_CREATE_TRANSLATIONS(i18n/lightspark.pot ALL i18n/pl.po i18n/fr.po
 
 ADD_SUBDIRECTORY(backends/interfaces/audio/pulse)
 #ADD_SUBDIRECTORY(backends/interfaces/audio/alsa)
-#ADD_SUBDIRECTORY(backends/interfaces/audio/openal)
+ADD_SUBDIRECTORY(backends/interfaces/audio/openal)
 
 #Install icons and desktop file
 if(UNIX)
