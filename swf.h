@@ -119,6 +119,7 @@ public:
 	void setVariableByString(const std::string& s, ASObject* o);*/
 	void registerChildClip(MovieClip* clip);
 	void unregisterChildClip(MovieClip* clip);
+	static RootMovieClip* getInstance(LoaderInfo* li);
 };
 
 class ThreadProfile
@@ -301,7 +302,6 @@ public:
 	bool useAVM2;
 	ParseThread(RootMovieClip* r,std::istream& in) DLL_PUBLIC;
 	~ParseThread();
-	void wait() DLL_PUBLIC;
 };
 
 };

@@ -321,7 +321,6 @@ private:
 	RootMovieClip* local_root;
 	bool loading;
 	bool loaded;
-	DisplayObject* content;
 	SOURCE source;
 	tiny_string url;
 	ByteArray* bytes;
@@ -330,9 +329,10 @@ private:
 	void threadAbort();
 	void jobFence();
 public:
-	Loader():local_root(NULL),loading(false),loaded(false),content(NULL)
+	Loader():local_root(NULL),loading(false),loaded(false)
 	{
 	}
+	~Loader();
 	static void sinit(Class_base* c);
 	static void buildTraits(ASObject* o);
 	ASFUNCTION(_constructor);
@@ -425,6 +425,9 @@ public:
 
 class Stage: public DisplayObjectContainer
 {
+private:
+	uint32_t internalGetHeight() const;
+	uint32_t internalGetWidth() const;
 public:
 	Stage();
 	static void sinit(Class_base* c);
@@ -452,6 +455,12 @@ public:
 	static void buildTraits(ASObject* o)
 	{
 	}
+};
+
+class StageQuality: public ASObject
+{
+public:
+	static void sinit(Class_base* c);
 };
 
 class LineScaleMode: public ASObject

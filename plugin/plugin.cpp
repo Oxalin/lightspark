@@ -23,12 +23,13 @@
 #include <string>
 #include <algorithm>
 #include "backends/urlutils.h"
+
 #define MIME_TYPES_HANDLED  "application/x-shockwave-flash"
 #define FAKE_MIME_TYPE  "application/x-lightspark"
 #define PLUGIN_NAME    "Shockwave Flash"
 #define FAKE_PLUGIN_NAME    "Lightspark player"
 #define MIME_TYPES_DESCRIPTION  MIME_TYPES_HANDLED":swf:"PLUGIN_NAME";"FAKE_MIME_TYPE":swfls:"FAKE_PLUGIN_NAME
-#define PLUGIN_DESCRIPTION "Shockwave Flash 10.0 r443"
+#define PLUGIN_DESCRIPTION "Shockwave Flash 10.0 r"SHORTVERSION
 
 using namespace std;
 
@@ -125,7 +126,7 @@ void NPDownloader::dlStartCallback(void* t)
 	th->started=true;
 	NPError e=NPN_GetURLNotify(th->instance, th->url.raw_buf(), NULL, th);
 	if(e!=NPERR_NO_ERROR)
-		abort();
+		th->setFailed(); //No need to crash, we can just mark the download failed
 }
 
 char* NPP_GetMIMEDescription(void)
@@ -229,7 +230,7 @@ nsPluginInstance::~nsPluginInstance()
 {
 	//Shutdown the system
 	sys=m_sys;
-	swf_buf.destroy();
+	swf_buf.stop();
 	m_pt->stop();
 	m_sys->setShutdownFlag();
 	m_sys->wait();
@@ -331,6 +332,7 @@ NPError nsPluginInstance::SetWindow(NPWindow* aWindow)
 		p.height=mHeight;
 		p.helper=AsyncHelper;
 		p.helperArg=this;
+		p.stream=&swf_buf;
 		LOG(LOG_NO_INFO,"X Window " << hex << p.window << dec << " Width: " << p.width << " Height: " << p.height);
 		m_sys->setParamsAndEngine(lightspark::GTKPLUG,&p);
 	}
@@ -471,7 +473,7 @@ NPError nsPluginInstance::DestroyStream(NPStream *stream, NPError reason)
 		cerr << "Destroy " << stream->pdata << endl;
 	else
 	{
-		swf_buf.destroy();
+		swf_buf.eof();
 		LOG(LOG_NO_INFO, _("DestroyStream on main stream"));
 	}
 	return NPERR_NO_ERROR;

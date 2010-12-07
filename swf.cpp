@@ -124,6 +124,13 @@ void RootMovieClip::setOnStage(bool staged)
 	MovieClip::setOnStage(staged);
 }
 
+RootMovieClip* RootMovieClip::getInstance(LoaderInfo* li)
+{
+	RootMovieClip* ret=new RootMovieClip(li);
+	ret->setPrototype(Class<MovieClip>::getClass());
+	return ret;
+}
+
 void SystemState::staticInit()
 {
 	//Do needed global initialization
@@ -281,12 +288,6 @@ void SystemState::setParameters(ASObject* p)
 
 void SystemState::stopEngines()
 {
-	//Stops the thread that is parsing us
-	if(parseThread)
-	{
-		parseThread->stop();
-		parseThread->wait();
-	}
 	if(threadPool)
 		threadPool->forceStop();
 	if(timerThread)
@@ -393,7 +394,7 @@ void SystemState::setError(const string& c)
 		timerThread->stop();
 		//Disable timed rendering
 		removeJob(renderThread);
-		renderThread->draw();
+		renderThread->draw(true);
 	}
 }
 
@@ -495,6 +496,8 @@ void SystemState::delayedCreation(SystemState* th)
 void SystemState::delayedStopping(SystemState* th)
 {
 	sys=th;
+	//This is called from the plugin, also kill the stream
+	th->npapiParams.stream->stop();
 	th->stopEngines();
 	sys=NULL;
 }
@@ -949,15 +952,6 @@ void ParseThread::threadAbort()
 	root->parsingFailed();
 }
 
-void ParseThread::wait()
-{
-	if(!isEnded)
-	{
-		sem_wait(&ended);
-		isEnded=true;
-	}
-}
-
 void RootMovieClip::initialize()
 {
 	if(!initialized && sys->currentVm)
@@ -965,7 +959,7 @@ void RootMovieClip::initialize()
 		initialized=true;
 		//Let's see if we have to bind the root movie clip itself
 		if(bindName.len())
-			sys->currentVm->addEvent(NULL,new BindClassEvent(this,bindName));
+			sys->currentVm->addEvent(NULL,new BindClassEvent(this,bindName,BindClassEvent::ISROOT));
 		//Now signal the completion for this root
 		sys->currentVm->addEvent(loaderInfo,Class<Event>::getInstanceS("init"));
 		//Wait for handling of all previous events

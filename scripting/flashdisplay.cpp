@@ -57,6 +57,7 @@ REGISTER_CLASS_NAME(Graphics);
 REGISTER_CLASS_NAME(LineScaleMode);
 REGISTER_CLASS_NAME(StageScaleMode);
 REGISTER_CLASS_NAME(StageAlign);
+REGISTER_CLASS_NAME(StageQuality);
 REGISTER_CLASS_NAME(Bitmap);
 
 void LoaderInfo::sinit(Class_base* c)
@@ -138,15 +139,11 @@ ASFUNCTIONBODY(Loader,_getContentLoaderInfo)
 ASFUNCTIONBODY(Loader,load)
 {
 	Loader* th=static_cast<Loader*>(obj);
-/*	if(th->loading)
+	if(th->loading)
 		return NULL;
-	th->loading=true;*/
-	throw UnsupportedException("Loader::load");
-/*	if(args->at(0)->getClassName()!="URLRequest")
-	{
-		LOG(ERROR,_("ArgumentError"));
-		abort();
-	}*/
+	th->loading=true;
+	assert_and_throw(argslen > 0 && args[0] && argslen <= 2);
+	assert_and_throw(args[0]->getPrototype()->isSubClass(Class<URLRequest>::getClass()));
 	URLRequest* r=static_cast<URLRequest*>(args[0]);
 	th->url=r->url;
 	th->source=URL;
@@ -177,6 +174,12 @@ ASFUNCTIONBODY(Loader,loadBytes)
 	return NULL;
 }
 
+Loader::~Loader()
+{
+	if(local_root && !sys->finalizingDestruction)
+		local_root->decRef();
+}
+
 void Loader::jobFence()
 {
 	decRef();
@@ -189,7 +192,7 @@ void Loader::sinit(Class_base* c)
 	c->max_level=c->super->max_level+1;
 	c->setGetterByQName("contentLoaderInfo","",Class<IFunction>::getFunction(_getContentLoaderInfo),true);
 	c->setMethodByQName("loadBytes","",Class<IFunction>::getFunction(loadBytes),true);
-//	c->setVariableByQName("load","",Class<IFunction>::getFunction(load));
+	c->setMethodByQName("load","",Class<IFunction>::getFunction(load),true);
 }
 
 void Loader::buildTraits(ASObject* o)
@@ -198,17 +201,27 @@ void Loader::buildTraits(ASObject* o)
 
 void Loader::execute()
 {
-	LOG(LOG_NOT_IMPLEMENTED,_("Loader async execution ") << url);
+	assert(source==URL || source==BYTES);
+	//The loaderInfo of the content is our contentLoaderInfo
+	contentLoaderInfo->incRef();
+	local_root=RootMovieClip::getInstance(contentLoaderInfo);
 	if(source==URL)
 	{
-		threadAbort();
-		/*local_root=new RootMovieClip;
-		zlib_file_filter zf;
-		zf.open(url.raw_buf(),ios_base::in);
-		istream s(&zf);
-
-		ParseThread local_pt(sys,local_root,s);
-		local_pt.wait();*/
+		//TODO: add security checks
+		LOG(LOG_CALLS,_("Loader async execution ") << url);
+		Downloader* downloader=sys->downloadManager->download(url, false);
+		downloader->waitForData(); //Wait for some data, making sure our check for failure is working
+		if(downloader->hasFailed()) //Check to see if the download failed for some reason
+		{
+			LOG(LOG_ERROR, "Loader::execute(): Download of URL failed: " << url);
+			sys->currentVm->addEvent(contentLoaderInfo,Class<Event>::getInstanceS("ioError"));
+			sys->downloadManager->destroy(downloader);
+			return;
+		}
+		istream s(downloader);
+		ParseThread* local_pt=new ParseThread(local_root,s);
+		local_pt->run();
+		sys->downloadManager->destroy(downloader);
 	}
 	else if(source==BYTES)
 	{
@@ -217,15 +230,11 @@ void Loader::execute()
 		//We only support swf files now
 		assert_and_throw(memcmp(bytes->bytes,"CWS",3)==0);
 
-		//The loaderInfo of the content is our contentLoaderInfo
-		contentLoaderInfo->incRef();
-		local_root=new RootMovieClip(contentLoaderInfo);
 		bytes_buf bb(bytes->bytes,bytes->len);
 		istream s(&bb);
 
 		ParseThread* local_pt = new ParseThread(local_root,s);
 		local_pt->run();
-		content=local_root;
 		bytes->decRef();
 	}
 	loaded=true;
@@ -253,7 +262,7 @@ void Loader::Render(bool maskEnabled)
 
 bool Loader::getBounds(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const
 {
-	if(content && content->getBounds(xmin,xmax,ymin,ymax))
+	if(local_root && local_root->getBounds(xmin,xmax,ymin,ymax))
 	{
 		getMatrix().multiply2D(xmin,ymin,xmin,ymin);
 		getMatrix().multiply2D(xmax,ymax,xmax,ymax);
@@ -2128,6 +2137,8 @@ void Stage::sinit(Class_base* c)
 	c->max_level=c->super->max_level+1;
 	c->setGetterByQName("stageWidth","",Class<IFunction>::getFunction(_getStageWidth),true);
 	c->setGetterByQName("stageHeight","",Class<IFunction>::getFunction(_getStageHeight),true);
+	c->setGetterByQName("width","",Class<IFunction>::getFunction(_getStageWidth),true);
+	c->setGetterByQName("height","",Class<IFunction>::getFunction(_getStageHeight),true);
 	c->setGetterByQName("scaleMode","",Class<IFunction>::getFunction(_getScaleMode),true);
 	c->setSetterByQName("scaleMode","",Class<IFunction>::getFunction(_setScaleMode),true);
 }
@@ -2145,9 +2156,8 @@ ASFUNCTIONBODY(Stage,_constructor)
 	return NULL;
 }
 
-ASFUNCTIONBODY(Stage,_getStageWidth)
+uint32_t Stage::internalGetWidth() const
 {
-	//Stage* th=static_cast<Stage*>(obj);
 	uint32_t width;
 	if(sys->scaleMode==SystemState::NO_SCALE && sys->getRenderThread())
 		width=sys->getRenderThread()->windowWidth;
@@ -2156,12 +2166,11 @@ ASFUNCTIONBODY(Stage,_getStageWidth)
 		RECT size=sys->getFrameSize();
 		width=size.Xmax/20;
 	}
-	return abstract_d(width);
+	return width;
 }
 
-ASFUNCTIONBODY(Stage,_getStageHeight)
+uint32_t Stage::internalGetHeight() const
 {
-	//Stage* th=static_cast<Stage*>(obj);
 	uint32_t height;
 	if(sys->scaleMode==SystemState::NO_SCALE && sys->getRenderThread())
 		height=sys->getRenderThread()->windowHeight;
@@ -2170,7 +2179,19 @@ ASFUNCTIONBODY(Stage,_getStageHeight)
 		RECT size=sys->getFrameSize();
 		height=size.Ymax/20;
 	}
-	return abstract_d(height);
+	return height;
+}
+
+ASFUNCTIONBODY(Stage,_getStageWidth)
+{
+	Stage* th=static_cast<Stage*>(obj);
+	return abstract_d(th->internalGetWidth());
+}
+
+ASFUNCTIONBODY(Stage,_getStageHeight)
+{
+	Stage* th=static_cast<Stage*>(obj);
+	return abstract_d(th->internalGetHeight());
 }
 
 ASFUNCTIONBODY(Stage,_getScaleMode)
@@ -2419,6 +2440,7 @@ ASFUNCTIONBODY(Graphics,endFill)
 
 void LineScaleMode::sinit(Class_base* c)
 {
+	c->setConstructor(NULL);
 	c->setVariableByQName("HORIZONTAL","",Class<ASString>::getInstanceS("horizontal"));
 	c->setVariableByQName("NONE","",Class<ASString>::getInstanceS("none"));
 	c->setVariableByQName("NORMAL","",Class<ASString>::getInstanceS("normal"));
@@ -2427,6 +2449,7 @@ void LineScaleMode::sinit(Class_base* c)
 
 void StageScaleMode::sinit(Class_base* c)
 {
+	c->setConstructor(NULL);
 	c->setVariableByQName("EXACT_FIT","",Class<ASString>::getInstanceS("exactFit"));
 	c->setVariableByQName("NO_BORDER","",Class<ASString>::getInstanceS("noBorder"));
 	c->setVariableByQName("NO_SCALE","",Class<ASString>::getInstanceS("noScale"));
@@ -2435,7 +2458,17 @@ void StageScaleMode::sinit(Class_base* c)
 
 void StageAlign::sinit(Class_base* c)
 {
+	c->setConstructor(NULL);
 	c->setVariableByQName("TOP_LEFT","",Class<ASString>::getInstanceS("TL"));
+}
+
+void StageQuality::sinit(Class_base* c)
+{
+	c->setConstructor(NULL);
+	c->setVariableByQName("BEST","",Class<ASString>::getInstanceS("best"));
+	c->setVariableByQName("HIGH","",Class<ASString>::getInstanceS("high"));
+	c->setVariableByQName("LOW","",Class<ASString>::getInstanceS("low"));
+	c->setVariableByQName("MEDIUM","",Class<ASString>::getInstanceS("medium"));
 }
 
 void Bitmap::sinit(Class_base* c)

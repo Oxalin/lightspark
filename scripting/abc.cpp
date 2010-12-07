@@ -117,7 +117,7 @@ void SymbolClassTag::execute(RootMovieClip* root)
 			DictionaryTag* t=root->dictionaryLookup(Tags[i]);
 			ASObject* base=dynamic_cast<ASObject*>(t);
 			assert_and_throw(base!=NULL);
-			BindClassEvent* e=new BindClassEvent(base,(const char*)Names[i]);
+			BindClassEvent* e=new BindClassEvent(base,(const char*)Names[i],BindClassEvent::NONROOT);
 			sys->currentVm->addEvent(NULL,e);
 			e->decRef();
 		}
@@ -199,6 +199,7 @@ void ABCVm::registerClasses()
 	builtin->setVariableByQName("LineScaleMode","flash.display",Class<LineScaleMode>::getClass());
 	builtin->setVariableByQName("StageScaleMode","flash.display",Class<StageScaleMode>::getClass());
 	builtin->setVariableByQName("StageAlign","flash.display",Class<StageAlign>::getClass());
+	builtin->setVariableByQName("StageQuality","flash.display",Class<StageQuality>::getClass());
 	builtin->setVariableByQName("IBitmapDrawable","flash.display",Class<ASObject>::getClass(QName("IBitmapDrawable","flash.display")));
 	builtin->setVariableByQName("BitmapData","flash.display",Class<ASObject>::getClass(QName("BitmapData","flash.display")));
 	builtin->setVariableByQName("Bitmap","flash.display",Class<Bitmap>::getClass());
@@ -268,6 +269,7 @@ void ABCVm::registerClasses()
 	builtin->setVariableByQName("Capabilities","flash.system",Class<Capabilities>::getClass());
 	builtin->setVariableByQName("Security","flash.system",Class<Security>::getClass());
 	builtin->setVariableByQName("ApplicationDomain","flash.system",Class<ApplicationDomain>::getClass());
+	builtin->setVariableByQName("SecurityDomain","flash.system",Class<SecurityDomain>::getClass());
 	builtin->setVariableByQName("LoaderContext","flash.system",Class<ASObject>::getClass(QName("LoaderContext","flash.system")));
 
 	builtin->setVariableByQName("SoundTransform","flash.media",Class<SoundTransform>::getClass());
@@ -1047,9 +1049,8 @@ void ABCVm::handleEvent(pair<EventDispatcher*,Event*> e)
 			case BIND_CLASS:
 			{
 				BindClassEvent* ev=static_cast<BindClassEvent*>(e.second);
-				bool isRoot= ev->base==sys;
 				LOG(LOG_CALLS,_("Binding of ") << ev->class_name);
-				buildClassAndInjectBase(ev->class_name.raw_buf(),ev->base,NULL,0,isRoot);
+				buildClassAndInjectBase(ev->class_name.raw_buf(),ev->base,NULL,0,ev->isRoot);
 				LOG(LOG_CALLS,_("End of binding of ") << ev->class_name);
 				break;
 			}

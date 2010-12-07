@@ -116,6 +116,12 @@ int main(int argc, char* argv[])
 			else if(strncmp(argv[i], "local-trusted", 13) == 0)
 				sandboxType = SecurityManager::LOCAL_TRUSTED;
 		}
+		else if(strcmp(argv[i],"-v")==0 || 
+			strcmp(argv[i],"--version")==0)
+		{
+			cout << "Lightspark version " << VERSION << " Copyright 2009-2010 Alessandro Pignotti" << endl;
+			exit(0);
+		}
 		else
 		{
 			//No options flag, so set the swf file name
@@ -134,7 +140,7 @@ int main(int argc, char* argv[])
 		cout << "Usage: " << argv[0] << " [--url|-u http://loader.url/file.swf]" << 
 			" [--disable-interpreter|-ni] [--enable-jit|-j] [--log-level|-l 0-4]" << 
 			" [--parameters-file|-p params-file] [--security-sandbox|-s sandbox] <file.swf>" << endl;
-		exit(-1);
+		exit(1);
 	}
 
 #ifndef WIN32
@@ -148,6 +154,11 @@ int main(int argc, char* argv[])
 
 	Log::initLogging(log_level);
 	ifstream f(fileName);
+	if(!f)
+	{
+		cout << argv[0] << ": " << fileName << ": No such file or directory" << endl;
+		exit(2);
+	}
 	f.exceptions ( istream::eofbit | istream::failbit | istream::badbit );
 	cout.exceptions( ios::failbit | ios::badbit);
 	cerr.exceptions( ios::failbit | ios::badbit);
@@ -183,7 +194,7 @@ int main(int argc, char* argv[])
 	if(!(useInterpreter || useJit))
 	{
 		LOG(LOG_ERROR,_("No execution model enabled"));
-		exit(-1);
+		exit(1);
 	}
 	sys->useInterpreter=useInterpreter;
 	sys->useJit=useJit;
@@ -208,7 +219,6 @@ int main(int argc, char* argv[])
 	sys->addJob(pt);
 
 	sys->wait();
-	pt->wait();
 	delete sys;
 	delete pt;
 
